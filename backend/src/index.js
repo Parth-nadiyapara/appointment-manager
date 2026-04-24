@@ -15,10 +15,7 @@ const allowedOrigins = [
   'https://caredesk-mu.vercel.app'
 ];
 
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+app.use(cors({ origin: '*' }));
 
 app.use(express.json());
 
