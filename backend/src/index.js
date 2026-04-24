@@ -9,11 +9,10 @@ import { endOfIstDayUtc, getIstToday, isoToIstDate, startOfIstDayUtc } from './t
 const app = express();
 const port = process.env.PORT || 4000;
 
-const cors = require('cors');
-
+// ✅ FIXED: Use the array we defined
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://caredesk-mu.vercel.app' // Add your live frontend URL here
+  'https://vercel.app'
 ];
 
 app.use(cors({
