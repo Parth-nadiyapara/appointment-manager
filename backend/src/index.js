@@ -12,7 +12,7 @@ const port = process.env.PORT || 4000;
 // ✅ FIXED: Use the array we defined
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://vercel.app'
+  'https://caredesk-mu.vercel.app'
 ];
 
 app.use(cors({
