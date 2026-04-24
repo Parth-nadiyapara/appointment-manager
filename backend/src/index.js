@@ -9,7 +9,18 @@ import { endOfIstDayUtc, getIstToday, isoToIstDate, startOfIstDayUtc } from './t
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+const cors = require('cors');
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://caredesk-mu.vercel.app' // Add your live frontend URL here
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
 app.use(express.json());
 
 async function requireUser(req, res, next) {
