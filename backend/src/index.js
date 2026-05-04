@@ -32,6 +32,21 @@ app.use(
 
 app.use(express.json());
 
+function normalizeService(service) {
+  if (!service) {
+    return service;
+  }
+
+  if (service.name === 'Coaching Discovery Call' && service.duration_minutes !== 45) {
+    return {
+      ...service,
+      duration_minutes: 45
+    };
+  }
+
+  return service;
+}
+
 async function requireUser(req, res, next) {
   const token = req.header('authorization')?.replace('Bearer ', '');
 
@@ -79,7 +94,7 @@ app.get('/api/services', async (req, res) => {
     return;
   }
 
-  res.json({ services: data });
+  res.json({ services: data.map(normalizeService) });
 });
 
 app.get('/api/availability', async (req, res) => {
@@ -91,9 +106,9 @@ app.get('/api/availability', async (req, res) => {
     return;
   }
 
-  const { data: service, error: serviceError } = await supabase
+  const { data: serviceData, error: serviceError } = await supabase
     .from('services')
-    .select('duration_minutes')
+    .select('name, duration_minutes')
     .eq('id', serviceId)
     .single();
 
@@ -101,6 +116,7 @@ app.get('/api/availability', async (req, res) => {
     res.status(404).json({ error: 'Service not found.' });
     return;
   }
+  const service = normalizeService(serviceData);
 
   const dayStart = startOfIstDayUtc(date);
   const dayEnd = endOfIstDayUtc(date);
@@ -130,9 +146,9 @@ app.post('/api/bookings', async (req, res) => {
 
   const { serviceId, startsAt, date, lead } = parsed.data;
 
-  const { data: service, error: serviceError } = await supabase
+  const { data: serviceData, error: serviceError } = await supabase
     .from('services')
-    .select('id, duration_minutes')
+    .select('id, name, duration_minutes')
     .eq('id', serviceId)
     .single();
 
@@ -140,6 +156,7 @@ app.post('/api/bookings', async (req, res) => {
     res.status(404).json({ error: 'Service not found.' });
     return;
   }
+  const service = normalizeService(serviceData);
 
   if (isoToIstDate(startsAt) !== date) {
     res.status(400).json({ error: 'Selected slot does not belong to the chosen IST date.' });
@@ -179,7 +196,7 @@ app.post('/api/bookings', async (req, res) => {
         email: lead.email,
         phone: lead.phone,
         inquiry: lead.inquiry,
-        status: 'Converted'
+        status: 'New'
       },
       { onConflict: 'email' }
     )
@@ -224,7 +241,7 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
   const dayStart = startOfIstDayUtc(today);
   const dayEnd = endOfIstDayUtc(today);
 
-  const [leadsResult, todayAppointmentsResult, appointmentsResult, leadAppointmentsResult] = await Promise.all([
+  const [leadsResult, todayAppointmentsResult, appointmentsResult] = await Promise.all([
     supabase.from('leads').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(25),
     supabase
       .from('appointments')
@@ -239,37 +256,24 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
       .neq('status', 'cancelled')
       .order('starts_at')
       .limit(12),
-    supabase
-      .from('appointments')
-      .select('id, lead_id')
-      .neq('status', 'cancelled')
   ]);
 
-  if (leadsResult.error || todayAppointmentsResult.error || appointmentsResult.error || leadAppointmentsResult.error) {
+  if (leadsResult.error || todayAppointmentsResult.error || appointmentsResult.error) {
     res.status(500).json({
       error:
         leadsResult.error?.message ||
         todayAppointmentsResult.error?.message ||
-        appointmentsResult.error?.message ||
-        leadAppointmentsResult.error?.message
+        appointmentsResult.error?.message
     });
     return;
   }
 
-  const bookedLeadIds = new Set(
-    (leadAppointmentsResult.data || []).map((appointment) => appointment.lead_id).filter(Boolean)
-  );
-  const leads = leadsResult.data.map((lead) => {
-    const statusLocked = bookedLeadIds.has(lead.id);
-
-    return {
-      ...lead,
-      status: statusLocked ? 'Converted' : lead.status,
-      status_locked: statusLocked
-    };
-  });
+  const leads = leadsResult.data.map((lead) => ({
+    ...lead,
+    status_locked: false
+  }));
   const pendingFollowUps = leads.filter(
-    (lead) => !lead.status_locked && (lead.status === 'New' || lead.status === 'Contacted')
+    (lead) => lead.status === 'New' || lead.status === 'Contacted'
   ).length;
   const appointments = appointmentsResult.data.map((appointment) => ({
     ...appointment,
@@ -288,28 +292,10 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
 });
 
 app.patch('/api/admin/leads/:id/status', requireUser, async (req, res) => {
-  const status = z.enum(['New', 'Contacted', 'Lost']).safeParse(req.body.status);
+  const status = z.enum(['New', 'Contacted', 'Converted', 'Lost']).safeParse(req.body.status);
 
   if (!status.success) {
     res.status(400).json({ error: 'Invalid lead status.' });
-    return;
-  }
-
-  const { data: activeAppointment, error: appointmentError } = await supabase
-    .from('appointments')
-    .select('id')
-    .eq('lead_id', req.params.id)
-    .neq('status', 'cancelled')
-    .limit(1)
-    .maybeSingle();
-
-  if (appointmentError) {
-    res.status(500).json({ error: appointmentError.message });
-    return;
-  }
-
-  if (activeAppointment) {
-    res.status(409).json({ error: 'This lead already has an appointment and must stay Converted.' });
     return;
   }
 

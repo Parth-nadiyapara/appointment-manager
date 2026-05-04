@@ -28,7 +28,15 @@ const statusStyles = {
   Converted: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   Lost: 'bg-slate-100 text-slate-600 border-slate-200'
 };
-const editableStatusOptions = ['New', 'Contacted', 'Lost'];
+const editableStatusOptions = ['New', 'Contacted', 'Converted', 'Lost'];
+
+function deriveDashboardKpis(dashboard) {
+  return {
+    totalLeads: dashboard.kpis.totalLeads || dashboard.leads.length,
+    appointmentsToday: dashboard.kpis.appointmentsToday || 0,
+    pendingFollowUps: dashboard.leads.filter((lead) => lead.status === 'New' || lead.status === 'Contacted').length
+  };
+}
 
 export default function App() {
   const [route, setRoute] = useState(window.location.pathname);
@@ -508,7 +516,11 @@ function AdminDashboard() {
     async function loadDashboard() {
       try {
         setLoading(true);
-        setDashboard(await api.getDashboard());
+        const nextDashboard = await api.getDashboard();
+        setDashboard({
+          ...nextDashboard,
+          kpis: deriveDashboardKpis(nextDashboard)
+        });
       } catch (err) {
         setError(err.message);
       } finally {
@@ -517,17 +529,41 @@ function AdminDashboard() {
     }
 
     loadDashboard();
+
+    const refreshTimer = window.setInterval(() => {
+      loadDashboard();
+    }, 30000);
+
+    return () => window.clearInterval(refreshTimer);
   }, []);
 
   async function changeStatus(leadId, status) {
     const previous = dashboard;
-    setDashboard((current) => ({
-      ...current,
-      leads: current.leads.map((lead) => (lead.id === leadId ? { ...lead, status } : lead))
-    }));
+    setDashboard((current) => {
+      const leads = current.leads.map((lead) => (lead.id === leadId ? { ...lead, status } : lead));
+      return {
+        ...current,
+        leads,
+        kpis: {
+          ...current.kpis,
+          pendingFollowUps: leads.filter((lead) => lead.status === 'New' || lead.status === 'Contacted').length
+        }
+      };
+    });
 
     try {
-      await api.updateLeadStatus(leadId, status);
+      const result = await api.updateLeadStatus(leadId, status);
+      setDashboard((current) => {
+        const leads = current.leads.map((lead) => (lead.id === leadId ? { ...lead, ...result.lead } : lead));
+        return {
+          ...current,
+          leads,
+          kpis: {
+            ...current.kpis,
+            pendingFollowUps: leads.filter((lead) => lead.status === 'New' || lead.status === 'Contacted').length
+          }
+        };
+      });
     } catch (err) {
       setDashboard(previous);
       setError(err.message);
@@ -541,7 +577,7 @@ function AdminDashboard() {
           <p className="text-sm font-semibold uppercase text-teal-700">Private dashboard</p>
           <h1 className="mt-2 text-3xl font-black text-slate-950">Lead and appointment command center</h1>
           <p className="mt-3 text-sm font-medium text-slate-600">
-            Follow-up stages stay editable until a non-cancelled appointment exists. After that, the lead is fixed to Converted.
+            Update leads through New, Contacted, Converted, or Lost as your follow-up moves forward.
           </p>
         </div>
         <button
