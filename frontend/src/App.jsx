@@ -30,17 +30,11 @@ const statusStyles = {
 };
 const editableStatusOptions = ['New', 'Contacted', 'Lost'];
 
-function getAdminUrl() {
-  return import.meta.env.VITE_ADMIN_URL?.trim() || '';
-}
-
 export default function App() {
   const [route, setRoute] = useState(window.location.pathname);
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const externalAdminUrl = getAdminUrl();
-  const useExternalAdmin = Boolean(externalAdminUrl);
 
   useEffect(() => {
     function syncRoute() {
@@ -56,18 +50,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const metadataRoute = useExternalAdmin && route.startsWith('/admin') ? '/' : route;
-    applyRouteMetadata(metadataRoute);
-    trackPageView(metadataRoute, document.title);
-  }, [route, useExternalAdmin]);
-
-  useEffect(() => {
-    if (!useExternalAdmin || !route.startsWith('/admin')) {
-      return;
-    }
-
-    window.location.replace(externalAdminUrl);
-  }, [externalAdminUrl, route, useExternalAdmin]);
+    applyRouteMetadata(route);
+    trackPageView(route, document.title);
+  }, [route]);
 
   useEffect(() => {
     if (!supabase) {
@@ -96,17 +81,6 @@ export default function App() {
     setRoute(path);
     setMobileNavOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function goToAdmin() {
-    setMobileNavOpen(false);
-
-    if (useExternalAdmin) {
-      window.location.assign(externalAdminUrl);
-      return;
-    }
-
-    navigate('/admin');
   }
 
   function scrollToSection(id) {
@@ -144,14 +118,6 @@ export default function App() {
             <NavLink onClick={() => scrollToSection('results')}>Results</NavLink>
             <NavLink onClick={() => scrollToSection('faq')}>FAQ</NavLink>
             <button
-              onClick={goToAdmin}
-              className={`rounded-md px-3 py-2 text-sm font-bold ${
-                !useExternalAdmin && route === '/admin' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              Admin
-            </button>
-            <button
               onClick={() => scrollToSection('booking')}
               className="inline-flex h-11 items-center gap-2 rounded-md bg-teal-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700"
             >
@@ -176,7 +142,6 @@ export default function App() {
               <MobileLink onClick={() => scrollToSection('process')}>Process</MobileLink>
               <MobileLink onClick={() => scrollToSection('results')}>Results</MobileLink>
               <MobileLink onClick={() => scrollToSection('faq')}>FAQ</MobileLink>
-              <MobileLink onClick={goToAdmin}>Admin</MobileLink>
               <button
                 onClick={() => scrollToSection('booking')}
                 className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-teal-600 px-5 text-sm font-bold text-white"
@@ -188,7 +153,7 @@ export default function App() {
         ) : null}
       </header>
 
-      {!useExternalAdmin && route === '/admin' ? (
+      {route === '/admin' ? (
         <PrivateAdmin session={session} authReady={authReady} />
       ) : (
         <PublicBookingPage onNavigate={navigate} />
@@ -411,9 +376,6 @@ function PublicBookingPage({ onNavigate }) {
             <div className="mt-6 flex flex-col items-start gap-4 text-sm font-bold text-slate-800">
               <button onClick={() => document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })}>Booking</button>
               <button onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>Services</button>
-              <button onClick={() => (getAdminUrl() ? window.location.assign(getAdminUrl()) : onNavigate('/admin'))}>
-                Admin
-              </button>
             </div>
           </div>
 
@@ -432,6 +394,12 @@ function PublicBookingPage({ onNavigate }) {
                 <MapPin className="h-4 w-4 text-teal-600" />
                 Built for modern consultation teams
               </p>
+              <button
+                onClick={() => onNavigate('/admin')}
+                className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 transition hover:text-teal-700"
+              >
+                Owner access
+              </button>
             </div>
           </div>
         </div>
