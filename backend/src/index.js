@@ -12,10 +12,23 @@ const port = process.env.PORT || 4000;
 // ✅ FIXED: Use the array we defined
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://caredesk-mu.vercel.app'
-];
+  'http://localhost:5174',
+  process.env.CLIENT_ORIGIN,
+  process.env.ADMIN_ORIGIN
+].filter(Boolean);
 
-app.use(cors({ origin: '*' }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Origin not allowed by CORS'));
+    }
+  })
+);
 
 app.use(express.json());
 
@@ -229,7 +242,6 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
     supabase
       .from('appointments')
       .select('id, lead_id')
-      .gte('starts_at', new Date().toISOString())
       .neq('status', 'cancelled')
   ]);
 
@@ -276,10 +288,28 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
 });
 
 app.patch('/api/admin/leads/:id/status', requireUser, async (req, res) => {
-  const status = z.enum(['New', 'Contacted', 'Converted', 'Lost']).safeParse(req.body.status);
+  const status = z.enum(['New', 'Contacted', 'Lost']).safeParse(req.body.status);
 
   if (!status.success) {
     res.status(400).json({ error: 'Invalid lead status.' });
+    return;
+  }
+
+  const { data: activeAppointment, error: appointmentError } = await supabase
+    .from('appointments')
+    .select('id')
+    .eq('lead_id', req.params.id)
+    .neq('status', 'cancelled')
+    .limit(1)
+    .maybeSingle();
+
+  if (appointmentError) {
+    res.status(500).json({ error: appointmentError.message });
+    return;
+  }
+
+  if (activeAppointment) {
+    res.status(409).json({ error: 'This lead already has an appointment and must stay Converted.' });
     return;
   }
 

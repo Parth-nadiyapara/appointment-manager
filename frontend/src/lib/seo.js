@@ -11,7 +11,7 @@ function ensureMeta(selector, attributeName, attributeValue) {
 }
 
 export function applyRouteMetadata(route) {
-  const isAdmin = route === '/admin';
+  const isAdmin = route.startsWith('/admin');
   const title = isAdmin
     ? 'CareDesk Admin | Lead and Appointment Dashboard'
     : 'CareDesk | Appointment Booking for Clinics and Coaching Centers';
