@@ -683,7 +683,7 @@ function MobileLink({ children, onClick }) {
 
 function HeroStat({ label, value }) {
   return (
-    <div className="rounded-md border border-white/15 bg-white/10 p-4 backdrop-blur">
+    <div className="rounded-md border border-white/15 bg-white/10 p-4 backdrop-blur transition duration-300 hover:-translate-y-1.5 hover:border-white/25 hover:bg-white/14 hover:shadow-[0_22px_48px_-26px_rgba(15,23,42,0.6)]">
       <p className="text-sm font-semibold text-slate-200">{label}</p>
       <p className="mt-2 text-2xl font-black text-white">{value}</p>
     </div>
@@ -692,7 +692,7 @@ function HeroStat({ label, value }) {
 
 function TrustPoint({ icon: Icon, title, text }) {
   return (
-    <article className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_18px_40px_-26px_rgba(15,23,42,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-24px_rgba(15,23,42,0.28)]">
+    <article className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_18px_40px_-26px_rgba(15,23,42,0.24)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_54px_-24px_rgba(15,23,42,0.24)]">
       <Icon className="mb-3 h-5 w-5 text-teal-600" />
       <h3 className="font-extrabold text-slate-950">{title}</h3>
       <p className="mt-2 text-sm font-medium leading-7 text-slate-600">{text}</p>
@@ -702,7 +702,7 @@ function TrustPoint({ icon: Icon, title, text }) {
 
 function ServiceCard({ title, text }) {
   return (
-    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)]">
+    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_58px_-24px_rgba(15,23,42,0.22)]">
       <h3 className="text-xl font-extrabold text-slate-950">{title}</h3>
       <p className="mt-3 text-sm font-medium leading-7 text-slate-600">{text}</p>
     </article>
@@ -711,7 +711,7 @@ function ServiceCard({ title, text }) {
 
 function ProcessStep({ number, title, text }) {
   return (
-    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)]">
+    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_58px_-24px_rgba(15,23,42,0.22)]">
       <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">{number}</p>
       <h3 className="mt-3 text-xl font-extrabold text-slate-950">{title}</h3>
       <p className="mt-3 text-sm font-medium leading-7 text-slate-600">{text}</p>
@@ -721,7 +721,7 @@ function ProcessStep({ number, title, text }) {
 
 function ResultCard({ title, text }) {
   return (
-    <article className="rounded-lg border border-white/10 bg-white/5 p-6 backdrop-blur">
+    <article className="rounded-lg border border-white/10 bg-white/5 p-6 backdrop-blur transition duration-300 hover:-translate-y-1.5 hover:border-white/20 hover:bg-white/8 hover:shadow-[0_28px_56px_-24px_rgba(2,6,23,0.45)]">
       <h3 className="text-xl font-bold text-white">{title}</h3>
       <p className="mt-3 text-sm leading-7 text-slate-300">{text}</p>
     </article>
@@ -730,7 +730,7 @@ function ResultCard({ title, text }) {
 
 function FaqItem({ title, text }) {
   return (
-    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)]">
+    <article className="rounded-xl border border-slate-300 bg-white p-6 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_58px_-24px_rgba(15,23,42,0.22)]">
       <h3 className="text-lg font-extrabold text-slate-950">{title}</h3>
       <p className="mt-3 text-sm font-medium leading-7 text-slate-600">{text}</p>
     </article>

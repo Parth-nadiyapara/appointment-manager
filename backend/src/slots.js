@@ -10,8 +10,6 @@ export function buildDailySlots(date, durationMinutes, appointments = []) {
   const booked = new Set(appointments.map((appointment) => appointment.starts_at));
   const slots = [];
   const now = Date.now();
-  const lunchStartsAt = new Date(dateAndTimeToUtcIso(date, LUNCH_START_HOUR, 0));
-  const lunchEndsAt = new Date(dateAndTimeToUtcIso(date, LUNCH_END_HOUR, 0));
 
   for (let hour = OPEN_HOUR; hour < CLOSE_HOUR; hour += 1) {
     for (let minute = 0; minute < 60; minute += SLOT_INTERVAL_MINUTES) {
@@ -19,9 +17,9 @@ export function buildDailySlots(date, durationMinutes, appointments = []) {
       const endsAt = new Date(new Date(startsAt).getTime() + durationMinutes * 60 * 1000);
       const closesAt = new Date(dateAndTimeToUtcIso(date, CLOSE_HOUR, 0));
       const inFuture = new Date(startsAt).getTime() > now;
-      const overlapsLunch = new Date(startsAt) < lunchEndsAt && endsAt > lunchStartsAt;
+      const startsDuringLunch = hour >= LUNCH_START_HOUR && hour < LUNCH_END_HOUR;
 
-      if (endsAt <= closesAt && !overlapsLunch) {
+      if (endsAt <= closesAt && !startsDuringLunch) {
         slots.push({
           startsAt,
           label: formatIstLabel(startsAt),

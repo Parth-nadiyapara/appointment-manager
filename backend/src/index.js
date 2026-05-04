@@ -37,10 +37,10 @@ function normalizeService(service) {
     return service;
   }
 
-  if (service.name === 'Coaching Discovery Call' && service.duration_minutes !== 45) {
+  if (service.name === 'Coaching Discovery Call' && service.duration_minutes !== 30) {
     return {
       ...service,
-      duration_minutes: 45
+      duration_minutes: 30
     };
   }
 

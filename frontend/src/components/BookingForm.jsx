@@ -186,6 +186,9 @@ export default function BookingForm() {
             <p className="text-sm text-slate-500">
               {selectedService ? `${selectedService.name} appointments are held in IST.` : 'Select a service.'}
             </p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Consultation hours: 9:00 am to 6:00 pm IST. Lunch break stays blocked from 1:00 pm to 2:00 pm.
+            </p>
           </div>
           {loadingSlots ? <Loader2 className="h-5 w-5 animate-spin text-primary-600" /> : null}
         </div>
