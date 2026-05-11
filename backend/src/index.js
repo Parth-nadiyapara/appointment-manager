@@ -219,6 +219,14 @@ async function createAppointmentAlerts(appointment, serviceName, userId) {
   await supabase.from('appointment_alerts').insert(alerts);
 }
 
+function normalizeName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 async function requireUser(req, res, next) {
   const token = req.header('authorization')?.replace('Bearer ', '');
 
@@ -265,8 +273,120 @@ const bookingSchema = z.object({
     inquiry: z.string().optional().default('')
   })
 });
+const registerSchema = z.object({
+  fullName: z.string().min(2).max(60).regex(/^[A-Za-z][A-Za-z\s]+$/),
+  phone: z.string().regex(/^[6-9]\d{9}$/),
+  email: z.string().email(),
+  password: z
+    .string()
+    .min(8)
+    .max(32)
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/)
+});
+const recoverPasswordSchema = z.object({
+  fullName: z.string().min(2).max(60).regex(/^[A-Za-z][A-Za-z\s]+$/),
+  phone: z.string().regex(/^[6-9]\d{9}$/),
+  email: z.string().email(),
+  newPassword: z
+    .string()
+    .min(8)
+    .max(32)
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/)
+});
 
 app.get('/api/health', (req, res) => {
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const parsed = registerSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid registration details.' });
+    return;
+  }
+
+  const { fullName, phone, email, password } = parsed.data;
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: fullName,
+      phone,
+      role: 'user'
+    }
+  });
+
+  if (error) {
+    res.status(400).json({ error: error.message });
+    return;
+  }
+
+  try {
+    await findOrCreateProfile(data.user);
+  } catch (profileError) {
+    res.status(500).json({ error: profileError.message });
+    return;
+  }
+
+  res.status(201).json({ ok: true });
+});
+
+app.post('/api/auth/recover-password', async (req, res) => {
+  const parsed = recoverPasswordSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid recovery request.' });
+    return;
+  }
+
+  const { fullName, phone, email, newPassword } = parsed.data;
+  const { data: listedUsers, error: listError } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 200
+  });
+
+  if (listError) {
+    res.status(500).json({ error: listError.message });
+    return;
+  }
+
+  const matchedUser = (listedUsers.users || []).find((user) => user.email?.toLowerCase() === email.toLowerCase());
+
+  if (!matchedUser) {
+    res.status(404).json({ error: 'No matching user found.' });
+    return;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('owner_name, phone')
+    .eq('id', matchedUser.id)
+    .maybeSingle();
+
+  if (profileError) {
+    res.status(500).json({ error: profileError.message });
+    return;
+  }
+
+  const savedName = normalizeName(profile?.owner_name || matchedUser.user_metadata?.full_name);
+  const savedPhone = normalizePhone(profile?.phone || matchedUser.user_metadata?.phone);
+
+  if (savedName !== normalizeName(fullName) || savedPhone !== normalizePhone(phone)) {
+    res.status(403).json({ error: 'The provided details do not match our records.' });
+    return;
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(matchedUser.id, {
+    password: newPassword
+  });
+
+  if (updateError) {
+    res.status(500).json({ error: updateError.message });
+    return;
+  }
+
   res.json({ ok: true });
 });
 
@@ -334,7 +454,7 @@ app.get('/api/availability', async (req, res) => {
   res.json({ slots: buildDailySlots(date, service.duration_minutes, appointments) });
 });
 
-app.post('/api/bookings', async (req, res) => {
+app.post('/api/bookings', requireUser, async (req, res) => {
   const parsed = bookingSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -343,7 +463,7 @@ app.post('/api/bookings', async (req, res) => {
   }
 
   const { serviceId, startsAt, date, lead } = parsed.data;
-  const authenticatedUser = await tryGetUserFromToken(req);
+  const authenticatedUser = req.user;
 
   const { data: serviceData, error: serviceError } = await supabase
     .from('services')

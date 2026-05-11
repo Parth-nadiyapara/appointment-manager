@@ -148,6 +148,15 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  function openPrimaryAction() {
+    if (session) {
+      scrollToSection('booking');
+      return;
+    }
+
+    scrollToSection('access');
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur">
@@ -165,6 +174,7 @@ export default function App() {
           </button>
 
           <nav className="hidden items-center gap-6 lg:flex">
+            <NavLink onClick={() => navigate('/')}>Home</NavLink>
             <NavLink onClick={() => scrollToSection('services')}>Services</NavLink>
             <NavLink onClick={() => scrollToSection('process')}>Process</NavLink>
             <NavLink onClick={() => scrollToSection('results')}>Results</NavLink>
@@ -199,18 +209,8 @@ export default function App() {
                 </button>
               </>
             ) : null}
-            {!identityLoading && !session ? (
-              <button
-                onClick={() => navigate('/auth')}
-                className={`rounded-md px-3 py-2 text-sm font-bold ${
-                  route === '/auth' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Sign in
-              </button>
-            ) : null}
             <button
-              onClick={() => scrollToSection('booking')}
+              onClick={openPrimaryAction}
               className="inline-flex h-11 items-center gap-2 rounded-md bg-teal-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700"
             >
               Book now
@@ -230,15 +230,15 @@ export default function App() {
         {mobileNavOpen ? (
           <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-2">
+              <MobileLink onClick={() => navigate('/')}>Home</MobileLink>
               <MobileLink onClick={() => scrollToSection('services')}>Services</MobileLink>
               <MobileLink onClick={() => scrollToSection('process')}>Process</MobileLink>
               <MobileLink onClick={() => scrollToSection('results')}>Results</MobileLink>
               <MobileLink onClick={() => scrollToSection('faq')}>FAQ</MobileLink>
               {!identityLoading && session ? <MobileLink onClick={() => navigate('/dashboard')}>My dashboard</MobileLink> : null}
               {!identityLoading && role === 'admin' ? <MobileLink onClick={() => navigate('/admin')}>Admin</MobileLink> : null}
-              {!identityLoading && !session ? <MobileLink onClick={() => navigate('/auth')}>Sign in</MobileLink> : null}
               <button
-                onClick={() => scrollToSection('booking')}
+                onClick={openPrimaryAction}
                 className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-teal-600 px-5 text-sm font-bold text-white"
               >
                 Book now
@@ -287,7 +287,7 @@ function PublicBookingPage({ onNavigate, session, profile }) {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={() => document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                onClick={openPrimaryAction}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-teal-500 px-5 text-sm font-bold text-white transition hover:bg-teal-400"
               >
                 Start booking
@@ -309,7 +309,7 @@ function PublicBookingPage({ onNavigate, session, profile }) {
         </div>
       </section>
 
-      <section id="booking" className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
+      <section id={session ? 'booking' : 'access'} className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
         <div className="grid gap-10 rounded-[28px] border border-slate-200 bg-white/78 p-6 shadow-[0_30px_80px_-38px_rgba(15,23,42,0.28)] backdrop-blur-sm lg:grid-cols-[0.95fr_1.05fr] lg:p-8">
         <div className="space-y-10">
           <div className="max-w-xl">
@@ -349,12 +349,20 @@ function PublicBookingPage({ onNavigate, session, profile }) {
         <div className="lg:sticky lg:top-28">
           <div className="rounded-[24px] border border-slate-300 bg-white p-5 shadow-[0_28px_70px_-30px_rgba(15,23,42,0.3)] sm:p-6">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-slate-950">Schedule a consultation</h2>
+              <h2 className="text-2xl font-bold text-slate-950">
+                {session ? 'Schedule a consultation' : 'Sign in or register first'}
+              </h2>
               <p className="mt-2 text-sm font-medium text-slate-600">
-                Choose a slot and share your details. Same-day expired times are removed based on IST.
+                {session
+                  ? 'Choose a slot and share your details. Same-day expired times are removed based on IST.'
+                  : 'Booking opens only after authentication. Create your account or sign in to continue.'}
               </p>
             </div>
-            <BookingForm session={session} profile={profile} onNavigate={onNavigate} />
+            {session ? (
+              <BookingForm session={session} profile={profile} onNavigate={onNavigate} />
+            ) : (
+              <AuthPortal session={session} role="user" onNavigate={onNavigate} embedded />
+            )}
           </div>
         </div>
         </div>

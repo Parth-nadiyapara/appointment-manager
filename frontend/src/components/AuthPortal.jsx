@@ -1,57 +1,72 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, KeyRound, Loader2, LogIn, MailCheck, ShieldCheck, UserPlus2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, KeyRound, Loader2, LogIn, ShieldCheck, UserPlus2 } from 'lucide-react';
+import { api } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
 
-function getInitialMode() {
-  if (typeof window === 'undefined') {
-    return 'signin';
-  }
+const fullNamePattern = /^[A-Za-z][A-Za-z\s]{1,59}$/;
+const phonePattern = /^[6-9]\d{9}$/;
+const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,32}$/;
 
-  const params = new URLSearchParams(window.location.search);
-  if (window.location.hash.includes('type=recovery') || params.get('mode') === 'reset') {
-    return 'reset';
-  }
-
-  return params.get('mode') || 'signin';
+function validateEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export default function AuthPortal({ session, role, onNavigate }) {
-  const [mode, setMode] = useState(getInitialMode);
+export default function AuthPortal({ session, role, onNavigate, embedded = false }) {
+  const [mode, setMode] = useState('signin');
   const [message, setMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [signInForm, setSignInForm] = useState({ email: '', password: '' });
-  const [signUpForm, setSignUpForm] = useState({ fullName: '', phone: '', email: '', password: '' });
-  const [verifyForm, setVerifyForm] = useState({ email: '', token: '' });
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [resetPassword, setResetPassword] = useState('');
-
-  useEffect(() => {
-    if (window.location.hash.includes('type=recovery')) {
-      setMode('reset');
-    }
-  }, []);
+  const [signUpForm, setSignUpForm] = useState({ fullName: '', phone: '', email: '', password: '', confirmPassword: '' });
+  const [forgotForm, setForgotForm] = useState({ fullName: '', phone: '', email: '', newPassword: '', confirmPassword: '' });
 
   const authTabs = useMemo(
     () => [
       { id: 'signin', label: 'Sign in', icon: LogIn },
       { id: 'signup', label: 'Register', icon: UserPlus2 },
-      { id: 'verify', label: 'Verify email', icon: MailCheck },
       { id: 'forgot', label: 'Forgot password', icon: KeyRound }
     ],
     []
   );
+
+  function validateRegistration(form) {
+    if (!fullNamePattern.test(form.fullName.trim())) {
+      return 'Enter a valid full name using letters and spaces only.';
+    }
+    if (!phonePattern.test(form.phone.trim())) {
+      return 'Enter a valid 10-digit mobile number.';
+    }
+    if (!validateEmail(form.email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (!passwordPattern.test(form.password)) {
+      return 'Password must be 8-32 characters with uppercase, lowercase, number, and special character.';
+    }
+    if (form.password !== form.confirmPassword) {
+      return 'Password and confirm password must match.';
+    }
+    return null;
+  }
 
   async function handleSignIn(event) {
     event.preventDefault();
     setSubmitting(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signInWithPassword(signInForm);
+    if (!validateEmail(signInForm.email.trim())) {
+      setMessage({ type: 'error', text: 'Enter a valid email address.' });
+      setSubmitting(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: signInForm.email.trim(),
+      password: signInForm.password
+    });
 
     if (error) {
       setMessage({ type: 'error', text: error.message });
     } else {
-      setMessage({ type: 'success', text: 'Signed in successfully. Redirecting to your CareDesk portal...' });
+      setMessage({ type: 'success', text: 'Signed in successfully. Opening your CareDesk dashboard...' });
     }
 
     setSubmitting(false);
@@ -62,49 +77,33 @@ export default function AuthPortal({ session, role, onNavigate }) {
     setSubmitting(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signUp({
-      email: signUpForm.email,
-      password: signUpForm.password,
-      options: {
-        data: {
-          full_name: signUpForm.fullName,
-          phone: signUpForm.phone
-        },
-        emailRedirectTo: `${window.location.origin}/auth`
-      }
-    });
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else {
-      setMessage({
-        type: 'success',
-        text: 'Check your email for the verification link or OTP, then come back here to verify and continue.'
-      });
-      setVerifyForm((current) => ({ ...current, email: signUpForm.email }));
-      setMode('verify');
+    const validationError = validateRegistration(signUpForm);
+    if (validationError) {
+      setMessage({ type: 'error', text: validationError });
+      setSubmitting(false);
+      return;
     }
 
-    setSubmitting(false);
-  }
+    try {
+      await api.register({
+        fullName: signUpForm.fullName.trim(),
+        phone: signUpForm.phone.trim(),
+        email: signUpForm.email.trim(),
+        password: signUpForm.password
+      });
 
-  async function handleVerifyOtp(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage(null);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: signUpForm.email.trim(),
+        password: signUpForm.password
+      });
 
-    const { error } = await supabase.auth.verifyOtp({
-      email: verifyForm.email,
-      token: verifyForm.token,
-      type: 'signup'
-    });
-
-    if (error) {
+      if (error) {
+        setMessage({ type: 'error', text: error.message });
+      } else {
+        setMessage({ type: 'success', text: 'Registration complete. Your CareDesk account is ready.' });
+      }
+    } catch (error) {
       setMessage({ type: 'error', text: error.message });
-    } else {
-      setMessage({ type: 'success', text: 'Email verified. You can sign in now.' });
-      setMode('signin');
-      setSignInForm((current) => ({ ...current, email: verifyForm.email }));
     }
 
     setSubmitting(false);
@@ -115,44 +114,201 @@ export default function AuthPortal({ session, role, onNavigate }) {
     setSubmitting(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${window.location.origin}/auth?mode=reset`
+    const validationError = validateRegistration({
+      ...forgotForm,
+      password: forgotForm.newPassword,
+      confirmPassword: forgotForm.confirmPassword
     });
+    if (validationError) {
+      setMessage({ type: 'error', text: validationError });
+      setSubmitting(false);
+      return;
+    }
 
-    if (error) {
+    try {
+      await api.recoverPassword({
+        fullName: forgotForm.fullName.trim(),
+        phone: forgotForm.phone.trim(),
+        email: forgotForm.email.trim(),
+        newPassword: forgotForm.newPassword
+      });
+      setMessage({ type: 'success', text: 'Password updated. You can sign in with your new password now.' });
+      setMode('signin');
+      setSignInForm((current) => ({ ...current, email: forgotForm.email.trim() }));
+    } catch (error) {
       setMessage({ type: 'error', text: error.message });
-    } else {
-      setMessage({ type: 'success', text: 'Password reset email sent. Open it and set a new password.' });
     }
 
     setSubmitting(false);
   }
 
-  async function handleResetPassword(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage(null);
-
-    const { error } = await supabase.auth.updateUser({ password: resetPassword });
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else {
-      setMessage({ type: 'success', text: 'Password updated. You can continue with your refreshed session.' });
-      window.history.replaceState({}, '', '/auth');
-    }
-
-    setSubmitting(false);
-  }
-
-  if (!supabase) {
-    return (
-      <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-8 text-amber-900 shadow-[0_24px_70px_-38px_rgba(180,83,9,0.34)]">
-          Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to enable sign in, registration, and session management.
+  const content = (
+    <article className={`rounded-[30px] border border-slate-200 bg-white/92 p-6 shadow-[0_28px_90px_-38px_rgba(15,23,42,0.22)] backdrop-blur-sm ${embedded ? '' : 'sm:p-8'}`}>
+      {session ? (
+        <div className="rounded-2xl border border-teal-200 bg-teal-50 p-6">
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Session active</p>
+          <h2 className="mt-2 text-2xl font-black text-slate-950">You are already signed in.</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Continue to {role === 'admin' ? 'the admin control center' : 'your booking dashboard'}.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => onNavigate(role === 'admin' ? '/admin' : '/dashboard')}
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-teal-600 px-5 text-sm font-bold text-white transition hover:bg-teal-700"
+            >
+              Open {role === 'admin' ? 'Admin' : 'My'} Dashboard
+            </button>
+            {!embedded ? (
+              <button
+                type="button"
+                onClick={() => onNavigate('/')}
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Stay on homepage
+              </button>
+            ) : null}
+          </div>
         </div>
-      </section>
-    );
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {authTabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMode(id)}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                  mode === id ? 'bg-teal-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            {mode === 'signin' ? (
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <Heading title="Sign in to CareDesk" text="Login first, then book and manage appointments from your personal dashboard." />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={signInForm.email}
+                  onChange={(event) => setSignInForm((current) => ({ ...current, email: event.target.value }))}
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  value={signInForm.password}
+                  onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value }))}
+                />
+                <SubmitButton submitting={submitting} label="Sign in" />
+              </form>
+            ) : null}
+
+            {mode === 'signup' ? (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <Heading title="Create your account" text="Register with valid details before booking any appointment." />
+                <Input
+                  label="Full name"
+                  value={signUpForm.fullName}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, fullName: event.target.value }))}
+                  pattern="[A-Za-z][A-Za-z\\s]{1,59}"
+                />
+                <Input
+                  label="Phone"
+                  value={signUpForm.phone}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                  inputMode="numeric"
+                  pattern="[6-9][0-9]{9}"
+                  maxLength={10}
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={signUpForm.email}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, email: event.target.value }))}
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  value={signUpForm.password}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value }))}
+                  minLength={8}
+                />
+                <Input
+                  label="Confirm password"
+                  type="password"
+                  value={signUpForm.confirmPassword}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  minLength={8}
+                />
+                <PasswordHint />
+                <SubmitButton submitting={submitting} label="Register" />
+              </form>
+            ) : null}
+
+            {mode === 'forgot' ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <Heading title="Change your password" text="Enter your name, email, and mobile number exactly as saved in CareDesk." />
+                <Input
+                  label="Full name"
+                  value={forgotForm.fullName}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, fullName: event.target.value }))}
+                  pattern="[A-Za-z][A-Za-z\\s]{1,59}"
+                />
+                <Input
+                  label="Phone"
+                  value={forgotForm.phone}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                  inputMode="numeric"
+                  pattern="[6-9][0-9]{9}"
+                  maxLength={10}
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={forgotForm.email}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, email: event.target.value }))}
+                />
+                <Input
+                  label="New password"
+                  type="password"
+                  value={forgotForm.newPassword}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, newPassword: event.target.value }))}
+                  minLength={8}
+                />
+                <Input
+                  label="Confirm new password"
+                  type="password"
+                  value={forgotForm.confirmPassword}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  minLength={8}
+                />
+                <PasswordHint />
+                <SubmitButton submitting={submitting} label="Change password" />
+              </form>
+            ) : null}
+          </div>
+
+          {message ? (
+            <div
+              className={`mt-6 rounded-2xl px-4 py-3 text-sm font-medium ${
+                message.type === 'success' ? 'bg-teal-50 text-teal-900' : 'bg-rose-50 text-rose-800'
+              }`}
+            >
+              {message.text}
+            </div>
+          ) : null}
+        </>
+      )}
+    </article>
+  );
+
+  if (embedded) {
+    return content;
   }
 
   return (
@@ -164,17 +320,17 @@ export default function AuthPortal({ session, role, onNavigate }) {
             CareDesk Access
           </div>
           <h1 className="mt-6 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Secure sign in for appointment tracking, reminders, and CareDesk sessions.
+            Secure sign in and registration for bookings, dashboards, and appointment tracking.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-8 text-slate-600">
-            Patients can register, verify their email, stay signed in across refreshes, and review appointments from a clean healthcare dashboard.
+            Register once, stay signed in across refreshes, and manage all future consultations from your patient dashboard.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <Feature title="Supabase Auth" text="Session persistence, secure sign in, password reset, and email verification." />
-            <Feature title="Booking dashboard" text="Track upcoming visits, completed consultations, and reminder alerts in one place." />
-            <Feature title="Role protection" text="Admin tools stay restricted to users marked as admin in Supabase." />
-            <Feature title="Calm medical UI" text="Soft shadows, premium cards, and responsive layouts that match CareDesk." />
+            <Feature title="Required login" text="Booking is available only after a valid CareDesk sign in or registration." />
+            <Feature title="Session persistence" text="Supabase keeps authenticated users signed in across refreshes and route changes." />
+            <Feature title="Personal dashboard" text="Upcoming appointments, completed visits, and alerts stay available in one place." />
+            <Feature title="Secure recovery" text="Password change is allowed only after matching name, email, and mobile records." />
           </div>
 
           <button
@@ -187,155 +343,7 @@ export default function AuthPortal({ session, role, onNavigate }) {
           </button>
         </article>
 
-        <article className="rounded-[30px] border border-slate-200 bg-white/88 p-6 shadow-[0_28px_90px_-38px_rgba(15,23,42,0.22)] backdrop-blur-sm sm:p-8">
-          {session && mode !== 'reset' ? (
-            <div className="rounded-2xl border border-teal-200 bg-teal-50 p-6">
-              <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Session active</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">You are already signed in.</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Continue to {role === 'admin' ? 'the admin control center' : 'your booking dashboard'}.
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => onNavigate(role === 'admin' ? '/admin' : '/dashboard')}
-                  className="inline-flex h-12 items-center justify-center rounded-xl bg-teal-600 px-5 text-sm font-bold text-white transition hover:bg-teal-700"
-                >
-                  Open {role === 'admin' ? 'Admin' : 'My'} Dashboard
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('/')}
-                  className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Stay on homepage
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {authTabs.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setMode(id)}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
-                      mode === id ? 'bg-teal-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6">
-                {mode === 'signin' ? (
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <Heading title="Sign in to CareDesk" text="Manage sessions securely and open your healthcare dashboard." />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={signInForm.email}
-                      onChange={(event) => setSignInForm((current) => ({ ...current, email: event.target.value }))}
-                    />
-                    <Input
-                      label="Password"
-                      type="password"
-                      value={signInForm.password}
-                      onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value }))}
-                    />
-                    <SubmitButton submitting={submitting} label="Sign in" />
-                  </form>
-                ) : null}
-
-                {mode === 'signup' ? (
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    <Heading title="Create your account" text="Register once and keep future appointments in your personal portal." />
-                    <Input
-                      label="Full name"
-                      value={signUpForm.fullName}
-                      onChange={(event) => setSignUpForm((current) => ({ ...current, fullName: event.target.value }))}
-                    />
-                    <Input
-                      label="Phone"
-                      value={signUpForm.phone}
-                      onChange={(event) => setSignUpForm((current) => ({ ...current, phone: event.target.value }))}
-                    />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={signUpForm.email}
-                      onChange={(event) => setSignUpForm((current) => ({ ...current, email: event.target.value }))}
-                    />
-                    <Input
-                      label="Password"
-                      type="password"
-                      value={signUpForm.password}
-                      onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value }))}
-                    />
-                    <SubmitButton submitting={submitting} label="Register" />
-                  </form>
-                ) : null}
-
-                {mode === 'verify' ? (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <Heading title="Verify email OTP" text="Paste the OTP from your email to complete account verification." />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={verifyForm.email}
-                      onChange={(event) => setVerifyForm((current) => ({ ...current, email: event.target.value }))}
-                    />
-                    <Input
-                      label="OTP code"
-                      value={verifyForm.token}
-                      onChange={(event) => setVerifyForm((current) => ({ ...current, token: event.target.value }))}
-                    />
-                    <SubmitButton submitting={submitting} label="Verify email" />
-                  </form>
-                ) : null}
-
-                {mode === 'forgot' ? (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    <Heading title="Reset your password" text="We’ll send a secure recovery link to your email address." />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={forgotEmail}
-                      onChange={(event) => setForgotEmail(event.target.value)}
-                    />
-                    <SubmitButton submitting={submitting} label="Send reset email" />
-                  </form>
-                ) : null}
-
-                {mode === 'reset' ? (
-                  <form onSubmit={handleResetPassword} className="space-y-4">
-                    <Heading title="Choose a new password" text="Set a fresh password to finish the recovery flow." />
-                    <Input
-                      label="New password"
-                      type="password"
-                      value={resetPassword}
-                      onChange={(event) => setResetPassword(event.target.value)}
-                    />
-                    <SubmitButton submitting={submitting} label="Update password" />
-                  </form>
-                ) : null}
-              </div>
-
-              {message ? (
-                <div
-                  className={`mt-6 rounded-2xl px-4 py-3 text-sm font-medium ${
-                    message.type === 'success' ? 'bg-teal-50 text-teal-900' : 'bg-rose-50 text-rose-800'
-                  }`}
-                >
-                  {message.text}
-                </div>
-              ) : null}
-            </>
-          )}
-        </article>
+        {content}
       </div>
     </section>
   );
@@ -356,6 +364,14 @@ function Heading({ title, text }) {
       <h2 className="text-2xl font-black text-slate-950">{title}</h2>
       <p className="mt-2 text-sm leading-7 text-slate-600">{text}</p>
     </div>
+  );
+}
+
+function PasswordHint() {
+  return (
+    <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      Use 8 to 32 characters with uppercase, lowercase, number, and special character.
+    </p>
   );
 }
 

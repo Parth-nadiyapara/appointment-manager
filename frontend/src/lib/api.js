@@ -26,6 +26,16 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  register: (payload) =>
+    request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  recoverPassword: (payload) =>
+    request('/auth/recover-password', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   getMe: () => request('/me'),
   getServices: () => request('/services'),
   getAvailableSlots: ({ serviceId, date }) =>
