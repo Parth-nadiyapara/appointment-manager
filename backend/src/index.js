@@ -123,7 +123,6 @@ app.get('/api/availability', async (req, res) => {
   const { data: appointments, error } = await supabase
     .from('appointments')
     .select('starts_at')
-    .eq('service_id', serviceId)
     .gte('starts_at', dayStart)
     .lte('starts_at', dayEnd)
     .neq('status', 'cancelled');
@@ -171,7 +170,6 @@ app.post('/api/bookings', async (req, res) => {
   const { data: existing, error: existingError } = await supabase
     .from('appointments')
     .select('id')
-    .eq('service_id', serviceId)
     .eq('starts_at', startsAt)
     .neq('status', 'cancelled')
     .maybeSingle();

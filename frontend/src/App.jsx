@@ -591,7 +591,7 @@ function AdminDashboard() {
 
       {error ? <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p> : null}
 
-      <div className="rounded-[28px] border border-slate-200 bg-white/80 p-6 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.26)] backdrop-blur-sm">
+      <div className="rounded-[28px] border border-slate-200 bg-white/80 p-6 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.26)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_34px_90px_-38px_rgba(15,23,42,0.28)]">
         <div className="grid gap-4 md:grid-cols-3">
           <KpiCard icon={UsersRound} label="Total Leads" value={dashboard.kpis.totalLeads} />
           <KpiCard icon={CalendarClock} label="Appointments Today" value={dashboard.kpis.appointmentsToday} />
@@ -599,16 +599,16 @@ function AdminDashboard() {
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-slate-200 bg-white/80 p-6 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.26)] backdrop-blur-sm">
+      <div className="rounded-[28px] border border-slate-200 bg-white/80 p-6 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.26)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_34px_90px_-38px_rgba(15,23,42,0.28)]">
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.2)]">
+        <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_56px_-24px_rgba(15,23,42,0.22)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-xl font-bold text-slate-950">Lead pipeline</h2>
             {loading ? <span className="text-sm text-slate-500">Loading...</span> : null}
           </div>
           <div className="space-y-3">
             {dashboard.leads.map((lead) => (
-              <article key={lead.id} className="rounded-xl border border-slate-300 bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.2)]">
+              <article key={lead.id} className="rounded-xl border border-slate-300 bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-[0_24px_46px_-24px_rgba(15,23,42,0.2)]">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                   <div>
                     <h3 className="font-bold text-slate-950">{lead.name}</h3>
@@ -638,7 +638,7 @@ function AdminDashboard() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.2)]">
+        <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_56px_-24px_rgba(15,23,42,0.22)]">
           <h2 className="mb-4 text-xl font-bold text-slate-950">Upcoming appointments</h2>
           <div className="space-y-3">
             {dashboard.appointments.length === 0 ? (
@@ -647,7 +647,7 @@ function AdminDashboard() {
               </div>
             ) : (
               dashboard.appointments.map((appointment) => (
-                <article key={appointment.id} className="rounded-xl border border-slate-300 bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.2)]">
+                  <article key={appointment.id} className="rounded-xl border border-slate-300 bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-[0_24px_46px_-24px_rgba(15,23,42,0.2)]">
                   <p className="font-bold text-slate-950">{appointment.service_name}</p>
                   <p className="mt-1 text-sm text-slate-600">{appointment.customer_name}</p>
                   <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-teal-700">
@@ -739,7 +739,7 @@ function FaqItem({ title, text }) {
 
 function KpiCard({ icon: Icon, label, value }) {
   return (
-    <article className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)]">
+    <article className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_52px_-24px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-bold text-slate-500">{label}</p>

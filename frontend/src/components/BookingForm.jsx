@@ -123,7 +123,7 @@ export default function BookingForm() {
       setSelectedSlot('');
       setMessage({
         type: 'success',
-        text: `Booked for ${formatIstDateTime(result.appointment.starts_at)} IST. We also saved this lead as Converted.`
+        text: `Booked for ${formatIstDateTime(result.appointment.starts_at)} IST.`
       });
       trackBookingCompleted(selectedService?.name || 'Appointment');
 
