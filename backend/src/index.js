@@ -47,6 +47,178 @@ function normalizeService(service) {
   return service;
 }
 
+function getRoleFromIdentity(profile, user) {
+  return profile?.role || user?.app_metadata?.role || user?.user_metadata?.role || 'user';
+}
+
+async function findOrCreateProfile(user) {
+  const { data: existingProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  const metadata = user.user_metadata || {};
+  const fallbackName = metadata.full_name || metadata.owner_name || user.email?.split('@')[0] || 'CareDesk User';
+  const { data: createdProfile, error: createError } = await supabase
+    .from('profiles')
+    .insert({
+      id: user.id,
+      business_name: metadata.business_name || fallbackName,
+      owner_name: metadata.full_name || metadata.owner_name || fallbackName,
+      phone: metadata.phone || null
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    throw createError;
+  }
+
+  return createdProfile;
+}
+
+async function tryGetUserFromToken(req) {
+  const token = req.header('authorization')?.replace('Bearer ', '');
+
+  if (!token) {
+    return null;
+  }
+
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data.user) {
+    return null;
+  }
+
+  return data.user;
+}
+
+function buildGeneratedAlerts(appointments) {
+  const now = Date.now();
+
+  return appointments
+    .flatMap((appointment) => {
+      const startsAt = new Date(appointment.starts_at).getTime();
+      const msUntilStart = startsAt - now;
+      const alerts = [
+        {
+          id: `scheduled-${appointment.id}`,
+          level: 'info',
+          status: 'unread',
+          title: `${appointment.service_name} scheduled`,
+          message: `Your appointment is booked for ${new Date(appointment.starts_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`,
+          remind_at: appointment.starts_at,
+          appointment_id: appointment.id
+        }
+      ];
+
+      if (msUntilStart > 0 && msUntilStart <= 24 * 60 * 60 * 1000) {
+        alerts.push({
+          id: `reminder-${appointment.id}`,
+          level: 'warning',
+          status: 'unread',
+          title: msUntilStart <= 60 * 60 * 1000 ? 'Consultation starts within 1 hour' : 'Appointment scheduled for tomorrow',
+          message:
+            msUntilStart <= 60 * 60 * 1000
+              ? `${appointment.service_name} begins soon. Please be ready for your slot.`
+              : `${appointment.service_name} is coming up tomorrow.`,
+          remind_at: appointment.starts_at,
+          appointment_id: appointment.id
+        });
+      }
+
+      if (startsAt < now) {
+        alerts.push({
+          id: `completed-${appointment.id}`,
+          level: 'success',
+          status: 'read',
+          title: 'Appointment completed',
+          message: `${appointment.service_name} has moved into your completed history.`,
+          remind_at: appointment.starts_at,
+          appointment_id: appointment.id
+        });
+      }
+
+      return alerts;
+    })
+    .sort((a, b) => new Date(b.remind_at).getTime() - new Date(a.remind_at).getTime());
+}
+
+async function fetchUserAlerts(user, appointments) {
+  const { data, error } = await supabase
+    .from('appointment_alerts')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('remind_at', { ascending: false })
+    .limit(12);
+
+  if (error) {
+    return buildGeneratedAlerts(appointments);
+  }
+
+  if (!data || data.length === 0) {
+    return buildGeneratedAlerts(appointments);
+  }
+
+  return data;
+}
+
+async function createAppointmentAlerts(appointment, serviceName, userId) {
+  if (!userId) {
+    return;
+  }
+
+  const startsAt = new Date(appointment.starts_at);
+  const alerts = [
+    {
+      appointment_id: appointment.id,
+      user_id: userId,
+      level: 'info',
+      status: 'unread',
+      title: `${serviceName} scheduled`,
+      message: `Your appointment is booked for ${startsAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`,
+      remind_at: appointment.starts_at
+    }
+  ];
+
+  const oneHourBefore = new Date(startsAt.getTime() - 60 * 60 * 1000);
+  if (oneHourBefore.getTime() > Date.now()) {
+    alerts.push({
+      appointment_id: appointment.id,
+      user_id: userId,
+      level: 'warning',
+      status: 'unread',
+      title: 'Your consultation starts in 1 hour',
+      message: `${serviceName} starts soon. Please be ready for your session.`,
+      remind_at: oneHourBefore.toISOString()
+    });
+  }
+
+  const tomorrowReminder = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000);
+  if (tomorrowReminder.getTime() > Date.now()) {
+    alerts.push({
+      appointment_id: appointment.id,
+      user_id: userId,
+      level: 'info',
+      status: 'unread',
+      title: 'Appointment scheduled for tomorrow',
+      message: `${serviceName} is coming up tomorrow.`,
+      remind_at: tomorrowReminder.toISOString()
+    });
+  }
+
+  await supabase.from('appointment_alerts').insert(alerts);
+}
+
 async function requireUser(req, res, next) {
   const token = req.header('authorization')?.replace('Bearer ', '');
 
@@ -63,6 +235,22 @@ async function requireUser(req, res, next) {
   }
 
   req.user = data.user;
+  try {
+    req.profile = await findOrCreateProfile(data.user);
+    req.role = getRoleFromIdentity(req.profile, data.user);
+  } catch (profileError) {
+    res.status(500).json({ error: profileError.message });
+    return;
+  }
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access only.' });
+    return;
+  }
+
   next();
 }
 
@@ -80,6 +268,17 @@ const bookingSchema = z.object({
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
+});
+
+app.get('/api/me', requireUser, async (req, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      email: req.user.email
+    },
+    profile: req.profile,
+    role: req.role
+  });
 });
 
 app.get('/api/services', async (req, res) => {
@@ -144,6 +343,7 @@ app.post('/api/bookings', async (req, res) => {
   }
 
   const { serviceId, startsAt, date, lead } = parsed.data;
+  const authenticatedUser = await tryGetUserFromToken(req);
 
   const { data: serviceData, error: serviceError } = await supabase
     .from('services')
@@ -187,40 +387,57 @@ app.post('/api/bookings', async (req, res) => {
     return;
   }
 
-  const { data: savedLead, error: leadError } = await supabase
+  const leadPayload = {
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    inquiry: lead.inquiry,
+    status: 'New'
+  };
+
+  const primaryLeadPayload = authenticatedUser?.id ? { ...leadPayload, user_id: authenticatedUser.id } : leadPayload;
+  let { data: savedLead, error: leadError } = await supabase
     .from('leads')
-    .upsert(
-      {
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-        inquiry: lead.inquiry,
-        status: 'New'
-      },
-      { onConflict: 'email' }
-    )
+    .upsert(primaryLeadPayload, { onConflict: 'email' })
     .select()
     .single();
+
+  if (leadError && leadError.message?.includes('user_id')) {
+    const retry = await supabase.from('leads').upsert(leadPayload, { onConflict: 'email' }).select().single();
+    savedLead = retry.data;
+    leadError = retry.error;
+  }
 
   if (leadError) {
     res.status(500).json({ error: leadError.message });
     return;
   }
 
-  const { data: appointment, error: appointmentError } = await supabase
+  const appointmentPayload = {
+    lead_id: savedLead.id,
+    service_id: serviceId,
+    customer_name: lead.name,
+    customer_email: lead.email,
+    customer_phone: lead.phone,
+    starts_at: startsAt,
+    ends_at: endsAt,
+    status: 'booked'
+  };
+  const primaryAppointmentPayload = authenticatedUser?.id
+    ? { ...appointmentPayload, customer_user_id: authenticatedUser.id }
+    : appointmentPayload;
+
+  let { data: appointment, error: appointmentError } = await supabase
     .from('appointments')
-    .insert({
-      lead_id: savedLead.id,
-      service_id: serviceId,
-      customer_name: lead.name,
-      customer_email: lead.email,
-      customer_phone: lead.phone,
-      starts_at: startsAt,
-      ends_at: endsAt,
-      status: 'booked'
-    })
+    .insert(primaryAppointmentPayload)
     .select()
     .single();
+
+  if (appointmentError && appointmentError.message?.includes('customer_user_id')) {
+    const retry = await supabase.from('appointments').insert(appointmentPayload).select().single();
+    appointment = retry.data;
+    appointmentError = retry.error;
+  }
 
   if (appointmentError) {
     if (appointmentError.code === '23505') {
@@ -232,10 +449,86 @@ app.post('/api/bookings', async (req, res) => {
     return;
   }
 
+  await createAppointmentAlerts(appointment, service.name, authenticatedUser?.id || null);
+
   res.status(201).json({ appointment, lead: savedLead });
 });
 
-app.get('/api/admin/dashboard', requireUser, async (req, res) => {
+app.get('/api/user/dashboard', requireUser, async (req, res) => {
+  const nowIso = new Date().toISOString();
+  const userEmail = req.user.email || '';
+
+  let { data: appointmentsData, error: appointmentsError } = await supabase
+    .from('appointments')
+    .select('id, service_id, customer_name, customer_email, starts_at, ends_at, status, services(name)')
+    .or(`customer_email.eq.${userEmail},customer_user_id.eq.${req.user.id}`)
+    .order('starts_at', { ascending: true })
+    .limit(30);
+
+  if (appointmentsError && appointmentsError.message?.includes('customer_user_id')) {
+    const retry = await supabase
+      .from('appointments')
+      .select('id, service_id, customer_name, customer_email, starts_at, ends_at, status, services(name)')
+      .eq('customer_email', userEmail)
+      .order('starts_at', { ascending: true })
+      .limit(30);
+    appointmentsData = retry.data;
+    appointmentsError = retry.error;
+  }
+
+  if (appointmentsError) {
+    res.status(500).json({ error: appointmentsError.message });
+    return;
+  }
+
+  const appointments = (appointmentsData || []).map((appointment) => {
+    const hasCompleted = new Date(appointment.ends_at).getTime() < Date.now() || appointment.status === 'completed';
+    return {
+      ...appointment,
+      service_name: appointment.services?.name || 'Appointment',
+      timeline_status: hasCompleted ? 'completed' : new Date(appointment.starts_at).toISOString() <= nowIso ? 'in_progress' : 'upcoming'
+    };
+  });
+
+  const alerts = await fetchUserAlerts(req.user, appointments);
+  const unreadAlerts = alerts.filter((alert) => alert.status !== 'read').length;
+
+  res.json({
+    profile: req.profile,
+    role: req.role,
+    kpis: {
+      totalBookings: appointments.length,
+      upcomingCount: appointments.filter((appointment) => appointment.timeline_status === 'upcoming').length,
+      completedCount: appointments.filter((appointment) => appointment.timeline_status === 'completed').length,
+      unreadAlerts
+    },
+    appointments,
+    alerts
+  });
+});
+
+app.patch('/api/user/alerts/:id/read', requireUser, async (req, res) => {
+  const { data, error } = await supabase
+    .from('appointment_alerts')
+    .update({ status: 'read' })
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.id)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    if (error.message?.includes('appointment_alerts')) {
+      res.json({ alert: null });
+      return;
+    }
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.json({ alert: data });
+});
+
+app.get('/api/admin/dashboard', requireUser, requireAdmin, async (req, res) => {
   const today = getIstToday();
   const dayStart = startOfIstDayUtc(today);
   const dayEnd = endOfIstDayUtc(today);
@@ -290,7 +583,7 @@ app.get('/api/admin/dashboard', requireUser, async (req, res) => {
   });
 });
 
-app.patch('/api/admin/leads/:id/status', requireUser, async (req, res) => {
+app.patch('/api/admin/leads/:id/status', requireUser, requireAdmin, async (req, res) => {
   const status = z.enum(['New', 'Contacted', 'Converted', 'Lost']).safeParse(req.body.status);
 
   if (!status.success) {

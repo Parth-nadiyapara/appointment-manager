@@ -13,7 +13,7 @@ const initialForm = {
   inquiry: ''
 };
 
-export default function BookingForm() {
+export default function BookingForm({ session, profile, onNavigate }) {
   const [services, setServices] = useState([]);
   const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(today);
@@ -29,6 +29,19 @@ export default function BookingForm() {
     () => services.find((service) => service.id === serviceId),
     [serviceId, services]
   );
+
+  useEffect(() => {
+    if (!session?.user) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      name: current.name || profile?.owner_name || session.user.user_metadata?.full_name || '',
+      email: current.email || session.user.email || '',
+      phone: current.phone || profile?.phone || session.user.user_metadata?.phone || ''
+    }));
+  }, [profile?.owner_name, profile?.phone, session]);
 
   useEffect(() => {
     let ignore = false;
@@ -145,6 +158,19 @@ export default function BookingForm() {
             ? 'Past slots are automatically removed for today.'
             : 'Select a future date to see the next available consultation slots.'}
         </p>
+        {session ? (
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-teal-700">
+            Signed in as {session.user.email}. Your booking will appear in your CareDesk dashboard automatically.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onNavigate('/auth')}
+            className="mt-2 text-xs font-bold uppercase tracking-wide text-teal-700 transition hover:text-teal-900"
+          >
+            Sign in to save appointments in your personal dashboard
+          </button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

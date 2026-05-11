@@ -11,17 +11,28 @@ function ensureMeta(selector, attributeName, attributeValue) {
 }
 
 export function applyRouteMetadata(route) {
+  const isPrivate = route.startsWith('/admin') || route.startsWith('/dashboard') || route.startsWith('/auth');
   const isAdmin = route.startsWith('/admin');
+  const isDashboard = route.startsWith('/dashboard');
+  const isAuth = route.startsWith('/auth');
   const title = isAdmin
     ? 'CareDesk Admin | Lead and Appointment Dashboard'
-    : 'CareDesk | Appointment Booking for Clinics and Coaching Centers';
+    : isDashboard
+      ? 'CareDesk Dashboard | My Appointments and Alerts'
+      : isAuth
+        ? 'CareDesk Access | Sign In and Register'
+        : 'CareDesk | Appointment Booking for Clinics and Coaching Centers';
   const description = isAdmin
     ? 'Private dashboard for managing appointments, leads, and follow-ups.'
-    : 'Professional appointment scheduling and lead capture for clinics, coaching centers, and consultation-led businesses.';
+    : isDashboard
+      ? 'Secure patient dashboard for reviewing appointments, reminders, and booking history.'
+      : isAuth
+        ? 'Secure authentication portal for signing in, registering, and managing your CareDesk session.'
+        : 'Professional appointment scheduling and lead capture for clinics, coaching centers, and consultation-led businesses.';
 
   document.title = title;
   ensureMeta('meta[name="description"]', 'name', 'description').setAttribute('content', description);
-  ensureMeta('meta[name="robots"]', 'name', 'robots').setAttribute('content', isAdmin ? 'noindex, nofollow' : 'index, follow');
+  ensureMeta('meta[name="robots"]', 'name', 'robots').setAttribute('content', isPrivate ? 'noindex, nofollow' : 'index, follow');
   ensureMeta('meta[property="og:title"]', 'property', 'og:title').setAttribute('content', title);
   ensureMeta('meta[property="og:description"]', 'property', 'og:description').setAttribute('content', description);
 }

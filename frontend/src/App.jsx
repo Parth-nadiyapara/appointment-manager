@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   BadgeCheck,
+  Bell,
   CalendarClock,
   ClipboardList,
   Clock3,
   Headset,
   LayoutDashboard,
+  Loader2,
   Mail,
   MapPin,
   Menu,
@@ -14,9 +16,12 @@ import {
   ShieldCheck,
   TrendingUp,
   UsersRound,
+  UserRound,
   X
 } from 'lucide-react';
+import AuthPortal from './components/AuthPortal.jsx';
 import BookingForm from './components/BookingForm.jsx';
+import UserDashboard from './components/UserDashboard.jsx';
 import { api, setAccessToken } from './lib/api';
 import { initAnalytics, trackPageView } from './lib/analytics';
 import { applyRouteMetadata } from './lib/seo';
@@ -41,7 +46,10 @@ function deriveDashboardKpis(dashboard) {
 export default function App() {
   const [route, setRoute] = useState(window.location.pathname);
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [role, setRole] = useState('user');
   const [authReady, setAuthReady] = useState(false);
+  const [identityLoading, setIdentityLoading] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
@@ -68,25 +76,61 @@ export default function App() {
       return undefined;
     }
 
+    async function syncIdentity(nextSession) {
+      setSession(nextSession);
+      setAccessToken(nextSession?.access_token || null);
+
+      if (!nextSession) {
+        setProfile(null);
+        setRole('user');
+        setIdentityLoading(false);
+        setAuthReady(true);
+        return;
+      }
+
+      setIdentityLoading(true);
+      try {
+        const identity = await api.getMe();
+        setProfile(identity.profile);
+        setRole(identity.role || 'user');
+      } catch (error) {
+        setProfile(null);
+        setRole('user');
+        await supabase.auth.signOut();
+      } finally {
+        setIdentityLoading(false);
+        setAuthReady(true);
+      }
+    }
+
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAccessToken(data.session?.access_token || null);
-      setAuthReady(true);
+      syncIdentity(data.session);
     });
 
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setAccessToken(nextSession?.access_token || null);
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth') {
+        navigate('/auth?mode=reset');
+      }
+      syncIdentity(nextSession);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!authReady || identityLoading || !session || route !== '/auth') {
+      return;
+    }
+
+    navigate(role === 'admin' ? '/admin' : '/dashboard');
+  }, [authReady, identityLoading, role, route, session]);
+
   function navigate(path) {
-    window.history.pushState({}, '', path);
-    setRoute(path);
+    const targetUrl = new URL(path, window.location.origin);
+    window.history.pushState({}, '', `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`);
+    setRoute(targetUrl.pathname);
     setMobileNavOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -125,6 +169,46 @@ export default function App() {
             <NavLink onClick={() => scrollToSection('process')}>Process</NavLink>
             <NavLink onClick={() => scrollToSection('results')}>Results</NavLink>
             <NavLink onClick={() => scrollToSection('faq')}>FAQ</NavLink>
+            {identityLoading ? <span className="text-sm font-semibold text-slate-400">Checking session...</span> : null}
+            {!identityLoading && session ? (
+              <>
+                {role === 'admin' ? (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className={`rounded-md px-3 py-2 text-sm font-bold ${
+                      route === '/admin' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold ${
+                    route === '/dashboard' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Bell className="h-4 w-4" />
+                  My dashboard
+                </button>
+                <button
+                  onClick={() => supabase?.auth.signOut()}
+                  className="rounded-md border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Logout
+                </button>
+              </>
+            ) : null}
+            {!identityLoading && !session ? (
+              <button
+                onClick={() => navigate('/auth')}
+                className={`rounded-md px-3 py-2 text-sm font-bold ${
+                  route === '/auth' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Sign in
+              </button>
+            ) : null}
             <button
               onClick={() => scrollToSection('booking')}
               className="inline-flex h-11 items-center gap-2 rounded-md bg-teal-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700"
@@ -150,6 +234,9 @@ export default function App() {
               <MobileLink onClick={() => scrollToSection('process')}>Process</MobileLink>
               <MobileLink onClick={() => scrollToSection('results')}>Results</MobileLink>
               <MobileLink onClick={() => scrollToSection('faq')}>FAQ</MobileLink>
+              {!identityLoading && session ? <MobileLink onClick={() => navigate('/dashboard')}>My dashboard</MobileLink> : null}
+              {!identityLoading && role === 'admin' ? <MobileLink onClick={() => navigate('/admin')}>Admin</MobileLink> : null}
+              {!identityLoading && !session ? <MobileLink onClick={() => navigate('/auth')}>Sign in</MobileLink> : null}
               <button
                 onClick={() => scrollToSection('booking')}
                 className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-teal-600 px-5 text-sm font-bold text-white"
@@ -161,16 +248,20 @@ export default function App() {
         ) : null}
       </header>
 
-      {route === '/admin' ? (
-        <PrivateAdmin session={session} authReady={authReady} />
+      {route === '/auth' ? (
+        <AuthPortal session={session} role={role} onNavigate={navigate} />
+      ) : route === '/dashboard' ? (
+        <UserDashboard session={session} profile={profile} role={role} authReady={authReady} onNavigate={navigate} />
+      ) : route === '/admin' ? (
+        <PrivateAdmin session={session} authReady={authReady} role={role} profile={profile} onNavigate={navigate} />
       ) : (
-        <PublicBookingPage onNavigate={navigate} />
+        <PublicBookingPage onNavigate={navigate} session={session} profile={profile} />
       )}
     </main>
   );
 }
 
-function PublicBookingPage({ onNavigate }) {
+function PublicBookingPage({ onNavigate, session, profile }) {
   return (
     <>
       <section
@@ -263,7 +354,7 @@ function PublicBookingPage({ onNavigate }) {
                 Choose a slot and share your details. Same-day expired times are removed based on IST.
               </p>
             </div>
-            <BookingForm />
+            <BookingForm session={session} profile={profile} onNavigate={onNavigate} />
           </div>
         </div>
         </div>
@@ -402,12 +493,6 @@ function PublicBookingPage({ onNavigate }) {
                 <MapPin className="h-4 w-4 text-teal-600" />
                 Built for modern consultation teams
               </p>
-              <button
-                onClick={() => onNavigate('/admin')}
-                className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 transition hover:text-teal-700"
-              >
-                Owner access
-              </button>
             </div>
           </div>
         </div>
@@ -416,7 +501,7 @@ function PublicBookingPage({ onNavigate }) {
   );
 }
 
-function PrivateAdmin({ session, authReady }) {
+function PrivateAdmin({ session, authReady, role, profile, onNavigate }) {
   if (!supabase) {
     return (
       <AdminShell>
@@ -430,80 +515,56 @@ function PrivateAdmin({ session, authReady }) {
   if (!authReady) {
     return (
       <AdminShell>
-        <p className="text-sm font-semibold text-slate-500">Checking session...</p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Checking session...
+        </p>
       </AdminShell>
     );
   }
 
-  return session ? <AdminDashboard /> : <AdminLogin />;
-}
-
-function AdminLogin() {
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
-  const [error, setError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-
-    const { error: authError } = await supabase.auth.signInWithPassword(credentials);
-
-    if (authError) {
-      setError(authError.message);
-    }
-
-    setSubmitting(false);
+  if (!session) {
+    return <AuthPortal session={session} role={role} onNavigate={onNavigate} />;
   }
 
-  return (
-    <AdminShell>
-      <section className="mx-auto max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase text-teal-700">Owner sign in</p>
-          <h1 className="mt-2 text-2xl font-black text-slate-950">Access the admin dashboard</h1>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Email</span>
-            <input
-              type="email"
-              value={credentials.email}
-              onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))}
-              className="h-12 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-              required
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Password</span>
-            <input
-              type="password"
-              value={credentials.password}
-              onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
-              className="h-12 w-full rounded-md border border-slate-300 px-3 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-              required
-            />
-          </label>
-          {error ? <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="h-12 w-full rounded-md bg-teal-600 px-5 text-sm font-bold text-white hover:bg-teal-700 disabled:bg-slate-300"
-          >
-            {submitting ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-      </section>
-    </AdminShell>
-  );
+  if (role !== 'admin') {
+    return (
+      <AdminShell>
+        <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-8 shadow-[0_28px_80px_-38px_rgba(180,83,9,0.22)]">
+          <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">Restricted area</p>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">Admin access is managed through Supabase roles.</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+            Your current account is signed in, but it is not marked as `admin`. Update the user role in Supabase and try again.
+          </p>
+          <div className="mt-6 flex gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigate('/dashboard')}
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-teal-600 px-5 text-sm font-bold text-white transition hover:bg-teal-700"
+            >
+              Open my dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => supabase?.auth.signOut()}
+              className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 transition hover:bg-white"
+            >
+              Logout
+            </button>
+          </div>
+        </section>
+      </AdminShell>
+    );
+  }
+
+  return <AdminDashboard profile={profile} />;
 }
 
 function AdminShell({ children }) {
   return <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</section>;
 }
 
-function AdminDashboard() {
+function AdminDashboard({ profile }) {
   const [dashboard, setDashboard] = useState({
     kpis: { totalLeads: 0, appointmentsToday: 0, pendingFollowUps: 0 },
     leads: [],
@@ -577,7 +638,7 @@ function AdminDashboard() {
           <p className="text-sm font-semibold uppercase text-teal-700">Private dashboard</p>
           <h1 className="mt-2 text-3xl font-black text-slate-950">Lead and appointment command center</h1>
           <p className="mt-3 text-sm font-medium text-slate-600">
-            Update leads through New, Contacted, Converted, or Lost as your follow-up moves forward.
+            Signed in as {profile?.owner_name || profile?.business_name || 'CareDesk admin'}. Manage leads, appointments, and follow-ups from one protected workspace.
           </p>
         </div>
         <button

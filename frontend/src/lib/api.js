@@ -26,6 +26,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getMe: () => request('/me'),
   getServices: () => request('/services'),
   getAvailableSlots: ({ serviceId, date }) =>
     request(`/availability?serviceId=${serviceId}&date=${date}`),
@@ -33,6 +34,11 @@ export const api = {
     request('/bookings', {
       method: 'POST',
       body: JSON.stringify(payload)
+    }),
+  getUserDashboard: () => request('/user/dashboard'),
+  markAlertRead: (alertId) =>
+    request(`/user/alerts/${alertId}/read`, {
+      method: 'PATCH'
     }),
   getDashboard: () => request('/admin/dashboard'),
   updateLeadStatus: (leadId, status) =>
