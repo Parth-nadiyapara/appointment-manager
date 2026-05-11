@@ -255,13 +255,13 @@ export default function App() {
       ) : route === '/admin' ? (
         <PrivateAdmin session={session} authReady={authReady} role={role} profile={profile} onNavigate={navigate} />
       ) : (
-        <PublicBookingPage onNavigate={navigate} session={session} profile={profile} />
+        <PublicBookingPage onNavigate={navigate} session={session} profile={profile} onPrimaryAction={openPrimaryAction} />
       )}
     </main>
   );
 }
 
-function PublicBookingPage({ onNavigate, session, profile }) {
+function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
   return (
     <>
       <section
@@ -287,7 +287,7 @@ function PublicBookingPage({ onNavigate, session, profile }) {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={openPrimaryAction}
+                onClick={onPrimaryAction}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-teal-500 px-5 text-sm font-bold text-white transition hover:bg-teal-400"
               >
                 Start booking
