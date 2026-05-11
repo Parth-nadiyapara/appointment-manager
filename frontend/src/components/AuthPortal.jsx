@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 
 const fullNamePattern = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
 const phonePattern = /^[6-9]\d{9}$/;
-const passwordPattern = /^\d{6,8}$/;
+const passwordPattern = /^.{6,8}$/;
 const strictEmailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i;
 
 function validateEmail(value) {
@@ -54,7 +54,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
       return 'Enter a valid email like name@gmail.com or name@domain.in.';
     }
     if (!passwordPattern.test(form.password)) {
-      return 'Password must be 6 to 8 digits only.';
+      return 'Password must be 6 to 8 characters.';
     }
     if (form.password !== form.confirmPassword) {
       return 'Password and confirm password must match.';
@@ -72,8 +72,8 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
     if (!validateEmail(form.email.trim())) {
       return 'Enter a valid email like name@gmail.com or name@domain.in.';
     }
-    if (!passwordPattern.test(form.currentPassword)) {
-      return 'Current password must be 6 to 8 digits only.';
+    if (!form.currentPassword || form.currentPassword.length < 6) {
+      return 'Current password must be at least 6 characters.';
     }
     return null;
   }
@@ -177,7 +177,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
     }
 
     if (!passwordPattern.test(forgotForm.newPassword)) {
-      setMessage({ type: 'error', text: 'New password must be 6 to 8 digits only.' });
+      setMessage({ type: 'error', text: 'New password must be 6 to 8 characters.' });
       setSubmitting(false);
       return;
     }
@@ -267,9 +267,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                   label="Password"
                   type="password"
                   value={signInForm.password}
-                  onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  inputMode="numeric"
-                  maxLength={8}
+                  onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value }))}
                 />
                 <SubmitButton submitting={submitting} label="Sign in" />
               </form>
@@ -302,8 +300,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                   label="Password"
                   type="password"
                   value={signUpForm.password}
-                  onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  inputMode="numeric"
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value.slice(0, 8) }))}
                   minLength={6}
                   maxLength={8}
                 />
@@ -311,8 +308,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                   label="Confirm password"
                   type="password"
                   value={signUpForm.confirmPassword}
-                  onChange={(event) => setSignUpForm((current) => ({ ...current, confirmPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  inputMode="numeric"
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, confirmPassword: event.target.value.slice(0, 8) }))}
                   minLength={6}
                   maxLength={8}
                 />
@@ -356,10 +352,8 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                   label="Current password"
                   type="password"
                   value={forgotForm.currentPassword}
-                  onChange={(event) => setForgotForm((current) => ({ ...current, currentPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                  inputMode="numeric"
+                  onChange={(event) => setForgotForm((current) => ({ ...current, currentPassword: event.target.value }))}
                   minLength={6}
-                  maxLength={8}
                 />
                 {forgotVerified ? (
                   <>
@@ -367,8 +361,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                       label="New password"
                       type="password"
                       value={forgotForm.newPassword}
-                      onChange={(event) => setForgotForm((current) => ({ ...current, newPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                      inputMode="numeric"
+                      onChange={(event) => setForgotForm((current) => ({ ...current, newPassword: event.target.value.slice(0, 8) }))}
                       minLength={6}
                       maxLength={8}
                     />
@@ -376,8 +369,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                       label="Confirm new password"
                       type="password"
                       value={forgotForm.confirmPassword}
-                      onChange={(event) => setForgotForm((current) => ({ ...current, confirmPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
-                      inputMode="numeric"
+                      onChange={(event) => setForgotForm((current) => ({ ...current, confirmPassword: event.target.value.slice(0, 8) }))}
                       minLength={6}
                       maxLength={8}
                     />
@@ -466,7 +458,7 @@ function Heading({ title, text }) {
 function PasswordHint() {
   return (
     <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-      Use 6 to 8 digits only.
+      Use 6 to 8 characters.
     </p>
   );
 }

@@ -233,22 +233,22 @@ const registerSchema = z.object({
     .string()
     .min(6)
     .max(8)
-    .regex(/^\d{6,8}$/)
+    .regex(/^.{6,8}$/)
 });
 const recoverPasswordSchema = z.object({
   fullName: z.string().min(2).max(60).regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/),
   email: z
     .string()
     .regex(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i),
-  currentPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/),
-  newPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/)
+  currentPassword: z.string().min(6),
+  newPassword: z.string().min(6).max(8).regex(/^.{6,8}$/)
 });
 const verifyPasswordResetSchema = z.object({
   fullName: z.string().min(2).max(60).regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/),
   email: z
     .string()
     .regex(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i),
-  currentPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/)
+  currentPassword: z.string().min(6)
 });
 
 app.get('/api/health', (req, res) => {
