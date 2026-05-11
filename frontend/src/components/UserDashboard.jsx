@@ -154,7 +154,7 @@ export default function UserDashboard({ session, profile, role, authReady, onNav
             Welcome back, {profile?.owner_name || session.user.email?.split('@')[0] || 'CareDesk user'}.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-600">
-            Review upcoming visits, completed consultations, and care reminders from one calm medical workspace.
+            Review upcoming visits, completed consultations, counseling sessions, and one-hour reminders from one calm medical workspace.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {role === 'admin' ? (
@@ -191,7 +191,7 @@ export default function UserDashboard({ session, profile, role, authReady, onNav
         <section className="space-y-6">
           <DashboardPanel title="Upcoming appointments" icon={Stethoscope} loading={loading}>
             {upcomingAppointments.length === 0 ? (
-              <EmptyState text="No upcoming appointments yet. Once you book, your next visit will appear here." />
+              <EmptyState text="No upcoming clinic or coaching appointments yet. Once you book, your next visit will appear here." />
             ) : (
               <div className="grid gap-4">
                 {upcomingAppointments.map((appointment) => (
@@ -203,7 +203,7 @@ export default function UserDashboard({ session, profile, role, authReady, onNav
 
           <DashboardPanel title="Completed visits" icon={CheckCircle2}>
             {completedAppointments.length === 0 ? (
-              <EmptyState text="Completed consultations will show up here after your appointments finish." />
+              <EmptyState text="Completed clinic visits and coaching sessions will show up here after they finish." />
             ) : (
               <div className="grid gap-4">
                 {completedAppointments.map((appointment) => (
@@ -217,7 +217,7 @@ export default function UserDashboard({ session, profile, role, authReady, onNav
         <section className="space-y-6">
           <DashboardPanel title="Care alerts" icon={Bell}>
             {dashboard.alerts.length === 0 ? (
-              <EmptyState text="No reminders right now. CareDesk will surface new alerts here." />
+              <EmptyState text="No one-hour reminders right now. CareDesk will surface your next alert here at the correct time." />
             ) : (
               <div className="space-y-3">
                 {dashboard.alerts.map((alert) => (
@@ -232,7 +232,7 @@ export default function UserDashboard({ session, profile, role, authReady, onNav
               <InfoTile label="Signed in email" value={session.user.email || 'Unavailable'} />
               <InfoTile label="Role" value={role} />
               <InfoTile label="Session state" value="Persisted via Supabase" />
-              <InfoTile label="Access protection" value="Authenticated route" />
+              <InfoTile label="Access protection" value="Authenticated care portal" />
             </div>
           </DashboardPanel>
         </section>
@@ -286,7 +286,7 @@ function AppointmentCard({ appointment, subdued = false }) {
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_24px_62px_-38px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_30px_72px_-34px_rgba(15,23,42,0.24)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-700">Consultation</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-700">Appointment</p>
           <h3 className="mt-2 text-xl font-black text-slate-950">{appointment.service_name}</h3>
           <p className="mt-2 text-sm text-slate-500">{formatDateTime(appointment.starts_at)}</p>
         </div>

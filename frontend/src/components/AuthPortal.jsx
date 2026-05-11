@@ -3,12 +3,13 @@ import { ArrowLeft, KeyRound, Loader2, LogIn, ShieldCheck, UserPlus2 } from 'luc
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
 
-const fullNamePattern = /^[A-Za-z][A-Za-z\s]{1,59}$/;
+const fullNamePattern = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
 const phonePattern = /^[6-9]\d{9}$/;
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,32}$/;
+const passwordPattern = /^\d{6,8}$/;
+const strictEmailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i;
 
 function validateEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return strictEmailPattern.test(value);
 }
 
 export default function AuthPortal({ session, role, onNavigate, embedded = false }) {
@@ -16,8 +17,22 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
   const [message, setMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [signInForm, setSignInForm] = useState({ email: '', password: '' });
-  const [signUpForm, setSignUpForm] = useState({ fullName: '', phone: '', email: '', password: '', confirmPassword: '' });
-  const [forgotForm, setForgotForm] = useState({ fullName: '', phone: '', email: '', newPassword: '', confirmPassword: '' });
+  const [signUpForm, setSignUpForm] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    acceptedTerms: false
+  });
+  const [forgotForm, setForgotForm] = useState({
+    fullName: '',
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [forgotVerified, setForgotVerified] = useState(false);
 
   const authTabs = useMemo(
     () => [
@@ -30,21 +45,45 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
 
   function validateRegistration(form) {
     if (!fullNamePattern.test(form.fullName.trim())) {
-      return 'Enter a valid full name using letters and spaces only.';
+      return 'Enter a valid full name using letters and one readable space between words.';
     }
     if (!phonePattern.test(form.phone.trim())) {
       return 'Enter a valid 10-digit mobile number.';
     }
     if (!validateEmail(form.email.trim())) {
-      return 'Enter a valid email address.';
+      return 'Enter a valid email like name@gmail.com or name@domain.in.';
     }
     if (!passwordPattern.test(form.password)) {
-      return 'Password must be 8-32 characters with uppercase, lowercase, number, and special character.';
+      return 'Password must be 6 to 8 digits only.';
     }
     if (form.password !== form.confirmPassword) {
       return 'Password and confirm password must match.';
     }
+    if (!form.acceptedTerms) {
+      return 'Please accept the terms and conditions to continue.';
+    }
     return null;
+  }
+
+  function validateForgotIdentity(form) {
+    if (!fullNamePattern.test(form.fullName.trim())) {
+      return 'Enter your full name using letters and one readable space between words.';
+    }
+    if (!validateEmail(form.email.trim())) {
+      return 'Enter a valid email like name@gmail.com or name@domain.in.';
+    }
+    if (!passwordPattern.test(form.currentPassword)) {
+      return 'Current password must be 6 to 8 digits only.';
+    }
+    return null;
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setMessage(null);
+    if (nextMode !== 'forgot') {
+      setForgotVerified(false);
+    }
   }
 
   async function handleSignIn(event) {
@@ -53,7 +92,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
     setMessage(null);
 
     if (!validateEmail(signInForm.email.trim())) {
-      setMessage({ type: 'error', text: 'Enter a valid email address.' });
+      setMessage({ type: 'error', text: 'Enter a valid email like name@gmail.com or name@domain.in.' });
       setSubmitting(false);
       return;
     }
@@ -100,7 +139,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
       if (error) {
         setMessage({ type: 'error', text: error.message });
       } else {
-        setMessage({ type: 'success', text: 'Registration complete. Your CareDesk account is ready.' });
+        setMessage({ type: 'success', text: 'Registration complete. Your account is ready for clinic and coaching bookings.' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
@@ -114,13 +153,37 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
     setSubmitting(true);
     setMessage(null);
 
-    const validationError = validateRegistration({
-      ...forgotForm,
-      password: forgotForm.newPassword,
-      confirmPassword: forgotForm.confirmPassword
-    });
-    if (validationError) {
-      setMessage({ type: 'error', text: validationError });
+    const identityError = validateForgotIdentity(forgotForm);
+    if (identityError) {
+      setMessage({ type: 'error', text: identityError });
+      setSubmitting(false);
+      return;
+    }
+
+    if (!forgotVerified) {
+      try {
+        await api.verifyPasswordResetIdentity({
+          fullName: forgotForm.fullName.trim(),
+          email: forgotForm.email.trim(),
+          currentPassword: forgotForm.currentPassword
+        });
+        setForgotVerified(true);
+        setMessage({ type: 'success', text: 'Account verified. You can update the password now.' });
+      } catch (error) {
+        setMessage({ type: 'error', text: error.message });
+      }
+      setSubmitting(false);
+      return;
+    }
+
+    if (!passwordPattern.test(forgotForm.newPassword)) {
+      setMessage({ type: 'error', text: 'New password must be 6 to 8 digits only.' });
+      setSubmitting(false);
+      return;
+    }
+
+    if (forgotForm.newPassword !== forgotForm.confirmPassword) {
+      setMessage({ type: 'error', text: 'New password and confirm password must match.' });
       setSubmitting(false);
       return;
     }
@@ -128,13 +191,15 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
     try {
       await api.recoverPassword({
         fullName: forgotForm.fullName.trim(),
-        phone: forgotForm.phone.trim(),
         email: forgotForm.email.trim(),
+        currentPassword: forgotForm.currentPassword,
         newPassword: forgotForm.newPassword
       });
       setMessage({ type: 'success', text: 'Password updated. You can sign in with your new password now.' });
+      setForgotVerified(false);
+      setForgotForm({ fullName: '', email: '', currentPassword: '', newPassword: '', confirmPassword: '' });
       setMode('signin');
-      setSignInForm((current) => ({ ...current, email: forgotForm.email.trim() }));
+      setSignInForm((current) => ({ ...current, email: forgotForm.email.trim(), password: '' }));
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
@@ -177,7 +242,7 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
               <button
                 key={id}
                 type="button"
-                onClick={() => setMode(id)}
+                onClick={() => switchMode(id)}
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
                   mode === id ? 'bg-teal-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
@@ -191,18 +256,20 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
           <div className="mt-6">
             {mode === 'signin' ? (
               <form onSubmit={handleSignIn} className="space-y-4">
-                <Heading title="Sign in to CareDesk" text="Login first, then book and manage appointments from your personal dashboard." />
+                <Heading title="Sign in to CareDesk" text="Log in first, then book and track clinic or coaching appointments from your dashboard." />
                 <Input
                   label="Email"
                   type="email"
                   value={signInForm.email}
-                  onChange={(event) => setSignInForm((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) => setSignInForm((current) => ({ ...current, email: event.target.value.trim() }))}
                 />
                 <Input
                   label="Password"
                   type="password"
                   value={signInForm.password}
-                  onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value }))}
+                  onChange={(event) => setSignInForm((current) => ({ ...current, password: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                  inputMode="numeric"
+                  maxLength={8}
                 />
                 <SubmitButton submitting={submitting} label="Sign in" />
               </form>
@@ -210,12 +277,12 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
 
             {mode === 'signup' ? (
               <form onSubmit={handleSignUp} className="space-y-4">
-                <Heading title="Create your account" text="Register with valid details before booking any appointment." />
+                <Heading title="Create your account" text="Register with valid details before booking a clinic or coaching appointment." />
                 <Input
                   label="Full name"
                   value={signUpForm.fullName}
                   onChange={(event) => setSignUpForm((current) => ({ ...current, fullName: event.target.value }))}
-                  pattern="[A-Za-z][A-Za-z\\s]{1,59}"
+                  pattern="[A-Za-z]+( [A-Za-z]+)*"
                 />
                 <Input
                   label="Phone"
@@ -229,22 +296,35 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
                   label="Email"
                   type="email"
                   value={signUpForm.email}
-                  onChange={(event) => setSignUpForm((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, email: event.target.value.trim() }))}
                 />
                 <Input
                   label="Password"
                   type="password"
                   value={signUpForm.password}
-                  onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value }))}
-                  minLength={8}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, password: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                  inputMode="numeric"
+                  minLength={6}
+                  maxLength={8}
                 />
                 <Input
                   label="Confirm password"
                   type="password"
                   value={signUpForm.confirmPassword}
-                  onChange={(event) => setSignUpForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-                  minLength={8}
+                  onChange={(event) => setSignUpForm((current) => ({ ...current, confirmPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                  inputMode="numeric"
+                  minLength={6}
+                  maxLength={8}
                 />
+                <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={signUpForm.acceptedTerms}
+                    onChange={(event) => setSignUpForm((current) => ({ ...current, acceptedTerms: event.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span>I accept the terms and conditions for booking, reminders, and account access.</span>
+                </label>
                 <PasswordHint />
                 <SubmitButton submitting={submitting} label="Register" />
               </form>
@@ -252,43 +332,59 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
 
             {mode === 'forgot' ? (
               <form onSubmit={handleForgotPassword} className="space-y-4">
-                <Heading title="Change your password" text="Enter your name, email, and mobile number exactly as saved in CareDesk." />
+                <Heading
+                  title="Change your password"
+                  text={
+                    forgotVerified
+                      ? 'Your account is confirmed. Enter the new password you want to use next.'
+                      : 'Enter your name, email, and current password. If they match CareDesk records, password update will open.'
+                  }
+                />
                 <Input
                   label="Full name"
                   value={forgotForm.fullName}
                   onChange={(event) => setForgotForm((current) => ({ ...current, fullName: event.target.value }))}
-                  pattern="[A-Za-z][A-Za-z\\s]{1,59}"
-                />
-                <Input
-                  label="Phone"
-                  value={forgotForm.phone}
-                  onChange={(event) => setForgotForm((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                  inputMode="numeric"
-                  pattern="[6-9][0-9]{9}"
-                  maxLength={10}
+                  pattern="[A-Za-z]+( [A-Za-z]+)*"
                 />
                 <Input
                   label="Email"
                   type="email"
                   value={forgotForm.email}
-                  onChange={(event) => setForgotForm((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, email: event.target.value.trim() }))}
                 />
                 <Input
-                  label="New password"
+                  label="Current password"
                   type="password"
-                  value={forgotForm.newPassword}
-                  onChange={(event) => setForgotForm((current) => ({ ...current, newPassword: event.target.value }))}
-                  minLength={8}
+                  value={forgotForm.currentPassword}
+                  onChange={(event) => setForgotForm((current) => ({ ...current, currentPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                  inputMode="numeric"
+                  minLength={6}
+                  maxLength={8}
                 />
-                <Input
-                  label="Confirm new password"
-                  type="password"
-                  value={forgotForm.confirmPassword}
-                  onChange={(event) => setForgotForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-                  minLength={8}
-                />
-                <PasswordHint />
-                <SubmitButton submitting={submitting} label="Change password" />
+                {forgotVerified ? (
+                  <>
+                    <Input
+                      label="New password"
+                      type="password"
+                      value={forgotForm.newPassword}
+                      onChange={(event) => setForgotForm((current) => ({ ...current, newPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                      inputMode="numeric"
+                      minLength={6}
+                      maxLength={8}
+                    />
+                    <Input
+                      label="Confirm new password"
+                      type="password"
+                      value={forgotForm.confirmPassword}
+                      onChange={(event) => setForgotForm((current) => ({ ...current, confirmPassword: event.target.value.replace(/\D/g, '').slice(0, 8) }))}
+                      inputMode="numeric"
+                      minLength={6}
+                      maxLength={8}
+                    />
+                    <PasswordHint />
+                  </>
+                ) : null}
+                <SubmitButton submitting={submitting} label={forgotVerified ? 'Update password' : 'Check account'} />
               </form>
             ) : null}
           </div>
@@ -320,17 +416,17 @@ export default function AuthPortal({ session, role, onNavigate, embedded = false
             CareDesk Access
           </div>
           <h1 className="mt-6 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Secure sign in and registration for bookings, dashboards, and appointment tracking.
+            Secure sign in for patients, parents, and coaching learners before every appointment request.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-8 text-slate-600">
-            Register once, stay signed in across refreshes, and manage all future consultations from your patient dashboard.
+            Register once, stay signed in across refreshes, and manage clinic visits or counseling sessions from one calm dashboard.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <Feature title="Required login" text="Booking is available only after a valid CareDesk sign in or registration." />
-            <Feature title="Session persistence" text="Supabase keeps authenticated users signed in across refreshes and route changes." />
-            <Feature title="Personal dashboard" text="Upcoming appointments, completed visits, and alerts stay available in one place." />
-            <Feature title="Secure recovery" text="Password change is allowed only after matching name, email, and mobile records." />
+            <Feature title="Required login" text="Booking opens only after a valid CareDesk sign in or registration." />
+            <Feature title="Session persistence" text="Supabase keeps patients and learners signed in across refreshes and route changes." />
+            <Feature title="Personal dashboard" text="Upcoming appointments, completed visits, and reminders stay available in one place." />
+            <Feature title="Secure recovery" text="Password change is allowed only after matching your saved name, email, and current password." />
           </div>
 
           <button
@@ -370,7 +466,7 @@ function Heading({ title, text }) {
 function PasswordHint() {
   return (
     <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-      Use 8 to 32 characters with uppercase, lowercase, number, and special character.
+      Use 6 to 8 digits only.
     </p>
   );
 }

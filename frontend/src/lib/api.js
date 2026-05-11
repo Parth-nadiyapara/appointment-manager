@@ -31,6 +31,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
+  verifyPasswordResetIdentity: (payload) =>
+    request('/auth/verify-password-reset', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   recoverPassword: (payload) =>
     request('/auth/recover-password', {
       method: 'POST',

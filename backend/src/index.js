@@ -102,53 +102,34 @@ async function tryGetUserFromToken(req) {
   return data.user;
 }
 
-function buildGeneratedAlerts(appointments) {
+function buildGeneratedAlerts(appointments, storedAlerts = []) {
   const now = Date.now();
+  const storedByAppointmentId = new Map(
+    storedAlerts
+      .filter((alert) => alert.appointment_id)
+      .map((alert) => [alert.appointment_id, alert])
+  );
 
   return appointments
     .flatMap((appointment) => {
       const startsAt = new Date(appointment.starts_at).getTime();
       const msUntilStart = startsAt - now;
-      const alerts = [
+      if (msUntilStart <= 0 || msUntilStart > 60 * 60 * 1000) {
+        return [];
+      }
+
+      const storedAlert = storedByAppointmentId.get(appointment.id);
+      return [
         {
-          id: `scheduled-${appointment.id}`,
-          level: 'info',
-          status: 'unread',
-          title: `${appointment.service_name} scheduled`,
-          message: `Your appointment is booked for ${new Date(appointment.starts_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`,
-          remind_at: appointment.starts_at,
+          id: storedAlert?.id || `reminder-${appointment.id}`,
+          level: 'warning',
+          status: storedAlert?.status || 'unread',
+          title: 'Your consultation starts within 1 hour',
+          message: `${appointment.service_name} starts soon. Please be ready for your session.`,
+          remind_at: storedAlert?.remind_at || new Date(startsAt - 60 * 60 * 1000).toISOString(),
           appointment_id: appointment.id
         }
       ];
-
-      if (msUntilStart > 0 && msUntilStart <= 24 * 60 * 60 * 1000) {
-        alerts.push({
-          id: `reminder-${appointment.id}`,
-          level: 'warning',
-          status: 'unread',
-          title: msUntilStart <= 60 * 60 * 1000 ? 'Consultation starts within 1 hour' : 'Appointment scheduled for tomorrow',
-          message:
-            msUntilStart <= 60 * 60 * 1000
-              ? `${appointment.service_name} begins soon. Please be ready for your slot.`
-              : `${appointment.service_name} is coming up tomorrow.`,
-          remind_at: appointment.starts_at,
-          appointment_id: appointment.id
-        });
-      }
-
-      if (startsAt < now) {
-        alerts.push({
-          id: `completed-${appointment.id}`,
-          level: 'success',
-          status: 'read',
-          title: 'Appointment completed',
-          message: `${appointment.service_name} has moved into your completed history.`,
-          remind_at: appointment.starts_at,
-          appointment_id: appointment.id
-        });
-      }
-
-      return alerts;
     })
     .sort((a, b) => new Date(b.remind_at).getTime() - new Date(a.remind_at).getTime());
 }
@@ -165,11 +146,7 @@ async function fetchUserAlerts(user, appointments) {
     return buildGeneratedAlerts(appointments);
   }
 
-  if (!data || data.length === 0) {
-    return buildGeneratedAlerts(appointments);
-  }
-
-  return data;
+  return buildGeneratedAlerts(appointments, data || []);
 }
 
 async function createAppointmentAlerts(appointment, serviceName, userId) {
@@ -178,45 +155,18 @@ async function createAppointmentAlerts(appointment, serviceName, userId) {
   }
 
   const startsAt = new Date(appointment.starts_at);
-  const alerts = [
-    {
-      appointment_id: appointment.id,
-      user_id: userId,
-      level: 'info',
-      status: 'unread',
-      title: `${serviceName} scheduled`,
-      message: `Your appointment is booked for ${startsAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`,
-      remind_at: appointment.starts_at
-    }
-  ];
-
   const oneHourBefore = new Date(startsAt.getTime() - 60 * 60 * 1000);
   if (oneHourBefore.getTime() > Date.now()) {
-    alerts.push({
+    await supabase.from('appointment_alerts').insert({
       appointment_id: appointment.id,
       user_id: userId,
       level: 'warning',
       status: 'unread',
-      title: 'Your consultation starts in 1 hour',
-      message: `${serviceName} starts soon. Please be ready for your session.`,
+      title: 'Your consultation starts within 1 hour',
+      message: `${serviceName} starts in 1 hour. Please be ready for your session.`,
       remind_at: oneHourBefore.toISOString()
     });
   }
-
-  const tomorrowReminder = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000);
-  if (tomorrowReminder.getTime() > Date.now()) {
-    alerts.push({
-      appointment_id: appointment.id,
-      user_id: userId,
-      level: 'info',
-      status: 'unread',
-      title: 'Appointment scheduled for tomorrow',
-      message: `${serviceName} is coming up tomorrow.`,
-      remind_at: tomorrowReminder.toISOString()
-    });
-  }
-
-  await supabase.from('appointment_alerts').insert(alerts);
 }
 
 function normalizeName(value) {
@@ -274,24 +224,31 @@ const bookingSchema = z.object({
   })
 });
 const registerSchema = z.object({
-  fullName: z.string().min(2).max(60).regex(/^[A-Za-z][A-Za-z\s]+$/),
+  fullName: z.string().min(2).max(60).regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/),
   phone: z.string().regex(/^[6-9]\d{9}$/),
-  email: z.string().email(),
+  email: z
+    .string()
+    .regex(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i),
   password: z
     .string()
-    .min(8)
-    .max(32)
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/)
+    .min(6)
+    .max(8)
+    .regex(/^\d{6,8}$/)
 });
 const recoverPasswordSchema = z.object({
-  fullName: z.string().min(2).max(60).regex(/^[A-Za-z][A-Za-z\s]+$/),
-  phone: z.string().regex(/^[6-9]\d{9}$/),
-  email: z.string().email(),
-  newPassword: z
+  fullName: z.string().min(2).max(60).regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/),
+  email: z
     .string()
-    .min(8)
-    .max(32)
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/)
+    .regex(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i),
+  currentPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/),
+  newPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/)
+});
+const verifyPasswordResetSchema = z.object({
+  fullName: z.string().min(2).max(60).regex(/^[A-Za-z]+(?: [A-Za-z]+)*$/),
+  email: z
+    .string()
+    .regex(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|in|org|net|edu|co\.in)$/i),
+  currentPassword: z.string().min(6).max(8).regex(/^\d{6,8}$/)
 });
 
 app.get('/api/health', (req, res) => {
@@ -341,28 +298,21 @@ app.post('/api/auth/recover-password', async (req, res) => {
     return;
   }
 
-  const { fullName, phone, email, newPassword } = parsed.data;
-  const { data: listedUsers, error: listError } = await supabase.auth.admin.listUsers({
-    page: 1,
-    perPage: 200
+  const { fullName, email, currentPassword, newPassword } = parsed.data;
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword
   });
 
-  if (listError) {
-    res.status(500).json({ error: listError.message });
-    return;
-  }
-
-  const matchedUser = (listedUsers.users || []).find((user) => user.email?.toLowerCase() === email.toLowerCase());
-
-  if (!matchedUser) {
-    res.status(404).json({ error: 'No matching user found.' });
+  if (signInError || !signInData.user) {
+    res.status(403).json({ error: 'The provided credentials do not match our records.' });
     return;
   }
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('owner_name, phone')
-    .eq('id', matchedUser.id)
+    .select('owner_name')
+    .eq('id', signInData.user.id)
     .maybeSingle();
 
   if (profileError) {
@@ -370,20 +320,59 @@ app.post('/api/auth/recover-password', async (req, res) => {
     return;
   }
 
-  const savedName = normalizeName(profile?.owner_name || matchedUser.user_metadata?.full_name);
-  const savedPhone = normalizePhone(profile?.phone || matchedUser.user_metadata?.phone);
+  const savedName = normalizeName(profile?.owner_name || signInData.user.user_metadata?.full_name);
 
-  if (savedName !== normalizeName(fullName) || savedPhone !== normalizePhone(phone)) {
-    res.status(403).json({ error: 'The provided details do not match our records.' });
+  if (savedName !== normalizeName(fullName)) {
+    res.status(403).json({ error: 'The provided credentials do not match our records.' });
     return;
   }
 
-  const { error: updateError } = await supabase.auth.admin.updateUserById(matchedUser.id, {
+  const { error: updateError } = await supabase.auth.admin.updateUserById(signInData.user.id, {
     password: newPassword
   });
 
   if (updateError) {
     res.status(500).json({ error: updateError.message });
+    return;
+  }
+
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/verify-password-reset', async (req, res) => {
+  const parsed = verifyPasswordResetSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid recovery request.' });
+    return;
+  }
+
+  const { fullName, email, currentPassword } = parsed.data;
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword
+  });
+
+  if (signInError || !signInData.user) {
+    res.status(403).json({ error: 'The provided credentials do not match our records.' });
+    return;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('owner_name')
+    .eq('id', signInData.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    res.status(500).json({ error: profileError.message });
+    return;
+  }
+
+  const savedName = normalizeName(profile?.owner_name || signInData.user.user_metadata?.full_name);
+
+  if (savedName !== normalizeName(fullName)) {
+    res.status(403).json({ error: 'The provided credentials do not match our records.' });
     return;
   }
 

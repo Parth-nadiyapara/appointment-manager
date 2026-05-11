@@ -283,7 +283,7 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
               Consultation booking that feels calm, credible, and easy to trust.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-200">
-              CareDesk turns appointment requests into organized leads, removes already-passed slots in IST, and gives owners a focused dashboard for follow-up.
+              CareDesk helps clinics, therapists, and coaching centers accept organized bookings, block unavailable slots in IST, and prepare every day with cleaner appointment visibility.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
@@ -303,7 +303,7 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               <HeroStat label="Avg intake" value="< 60 sec" />
               <HeroStat label="Timezone" value="IST aware" />
-              <HeroStat label="Follow-up flow" value="Lead to booked" />
+              <HeroStat label="Daily flow" value="Booked to guided" />
             </div>
           </div>
         </div>
@@ -315,17 +315,17 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
           <div className="max-w-xl">
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Built for consultation businesses</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Book appointments without losing promising leads.
+              Book appointments with the calm feel of a real reception desk.
             </h2>
             <p className="mt-4 text-lg font-medium leading-8 text-slate-700">
-              Visitors choose a service, pick an IST time slot, and leave enough context for your team to respond with confidence. The result feels more like a real front desk than a generic form.
+              Patients, parents, and coaching learners choose a service, pick an IST time slot, and share the details your team needs before the visit starts.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <TrustPoint icon={PhoneCall} title="Fast intake" text="Capture contact details and inquiry context in one step." />
-            <TrustPoint icon={CalendarClock} title="Clean calendar" text="Booked or expired slots stop showing immediately." />
-            <TrustPoint icon={TrendingUp} title="Lead ready" text="Appointments move straight into a workable follow-up pipeline." />
+            <TrustPoint icon={PhoneCall} title="Quick patient intake" text="Collect name, contact details, and visit purpose in one guided step." />
+            <TrustPoint icon={CalendarClock} title="Live schedule clarity" text="Booked or expired slots disappear so staff do not promise unavailable times." />
+            <TrustPoint icon={TrendingUp} title="Prepared follow-up" text="Every booking lands with enough context for care guidance or counseling response." />
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-[0_18px_42px_-30px_rgba(15,23,42,0.18)]">
@@ -340,7 +340,7 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
               </span>
               <span className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-3 py-2">
                 <Headset className="h-4 w-4 text-teal-600" />
-                Lead dashboard included
+                Admin desk included
               </span>
             </div>
           </div>
@@ -373,21 +373,21 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Service fit</p>
             <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">
-              A polished front door for high-trust appointments.
+              Built for healthcare visits and coaching conversations that need trust.
             </h2>
           </div>
           <div className="mt-10 grid gap-5 md:grid-cols-3">
             <ServiceCard
               title="Small clinics"
-              text="Handle consultations, therapy sessions, diagnostics, and care follow-ups without making patients call for every booking."
+              text="Handle consultations, diagnostics, follow-up reviews, and wellness sessions without forcing patients to call every time."
             />
             <ServiceCard
               title="Coaching centers"
-              text="Use one place for discovery calls, counselling sessions, parent meetings, and enrollment-focused lead capture."
+              text="Use one booking flow for discovery calls, parent counseling, mentoring sessions, and course guidance meetings."
             />
             <ServiceCard
-              title="Private consultants"
-              text="Create a booking flow that feels premium, filters outdated slots, and keeps every inquiry tied to a lead record."
+              title="Therapists and specialists"
+              text="Offer a premium appointment journey that protects session timing, collects context, and keeps case notes organized."
             />
           </div>
         </div>
@@ -397,22 +397,22 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Process</p>
-            <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">Simple for visitors, structured for owners.</h2>
+            <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">Simple for patients and learners, structured for staff.</h2>
             <p className="mt-4 text-lg leading-8 text-slate-600">
-              The public site makes scheduling feel immediate. The private dashboard keeps the business side organized without making the workflow heavy.
+              The public side feels easy to trust, while the private side helps front-desk teams, coaches, and clinic staff prepare the next conversation clearly.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            <ProcessStep number="01" title="Select a service" text="Visitors choose the consultation type and a valid date." />
+            <ProcessStep number="01" title="Choose the visit type" text="Patients and learners pick the consultation, counseling, or coaching session they need." />
             <ProcessStep
               number="02"
-              title="See only real slots"
-              text="Times are shown in IST and expired same-day slots disappear automatically."
+              title="View only active slots"
+              text="Times stay in IST, lunch time remains blocked, and expired same-day options disappear automatically."
             />
             <ProcessStep
               number="03"
-              title="Capture and convert"
-              text="Each successful booking updates the lead pipeline so follow-up starts with context."
+              title="Arrive prepared"
+              text="Each successful booking gives your team the details needed for a smoother visit, follow-up, or parent conversation."
             />
           </div>
         </div>
@@ -422,16 +422,16 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 text-white sm:px-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-300">Operational clarity</p>
-            <h2 className="mt-3 text-3xl font-black sm:text-4xl">Owners get a dashboard that keeps the next action obvious.</h2>
+            <h2 className="mt-3 text-3xl font-black sm:text-4xl">Admins get a dashboard that keeps the next patient or learner visible.</h2>
             <p className="mt-4 max-w-xl text-lg leading-8 text-slate-300">
-              Total leads, appointments due today, and pending follow-ups stay visible. New inquiries can move from New to Contacted to Converted without leaving the system.
+              Today’s bookings, pending follow-ups, and upcoming consultations stay in one place so reception teams and coaching coordinators can respond faster.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <ResultCard title="Lead pipeline" text="See the latest inquiries, update status quickly, and keep the team aligned on next contact." />
-            <ResultCard title="Upcoming calendar" text="Review appointments in time order so owners can prep their day without switching tools." />
-            <ResultCard title="Trust-focused intake" text="A calmer public booking flow improves completion rates for services that need confidence." />
-            <ResultCard title="Deployment-ready base" text="Frontend and backend are separated for GitHub and Vercel workflows." />
+            <ResultCard title="Patient pipeline" text="Review fresh inquiries, update contact stages, and keep every follow-up visible to staff." />
+            <ResultCard title="Upcoming sessions" text="See the day’s clinic visits or coaching appointments in order before they begin." />
+            <ResultCard title="Reminder visibility" text="One-hour reminders help users arrive prepared instead of missing important appointments." />
+            <ResultCard title="Calm intake flow" text="A professional booking experience builds confidence before medical care or counseling even starts." />
           </div>
         </div>
       </section>
@@ -439,24 +439,24 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
       <section id="faq" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">FAQ</p>
-          <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">Questions business owners usually ask first.</h2>
+          <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">Questions clinics and coaching centers usually ask first.</h2>
         </div>
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <FaqItem
-            title="Can visitors still double-book the same time?"
-            text="No. The API checks availability again before insert, and Supabase also enforces a unique active slot at the database level."
+            title="Can two people still book the same time slot?"
+            text="No. CareDesk checks slot overlap again while booking, so already-reserved consultation times cannot be taken twice."
           />
           <FaqItem
             title="What timezone does the public page use?"
             text="The booking page now works in IST. Same-day expired slots are hidden and the backend rejects times that have already passed."
           />
           <FaqItem
-            title="Will leads update after booking?"
-            text="Yes. Successful bookings automatically upsert the lead and move the status to Converted."
+            title="Can patients and learners see their own appointments later?"
+            text="Yes. Signed-in users can open their dashboard to review upcoming bookings, completed visits, and reminder cards."
           />
           <FaqItem
-            title="Can this be deployed to Vercel and GitHub?"
-            text="Yes. The project is now organized into separate frontend and backend workspaces so deployment is straightforward."
+            title="When does the reminder alert appear?"
+            text="The dashboard reminder appears only during the final one hour before the appointment starts, so users are nudged at the right time."
           />
         </div>
       </section>
@@ -470,11 +470,11 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
               </span>
               <div>
                 <p className="text-lg font-black text-slate-950">CareDesk</p>
-                <p className="text-sm text-slate-500">Appointment booking and lead management</p>
+                <p className="text-sm text-slate-500">Appointment booking for clinics and coaching centers</p>
               </div>
             </div>
             <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-              Built for consultation-led businesses that need a booking website, clear appointment operations, and a more professional digital first impression.
+              Built for healthcare and coaching teams that need cleaner appointment intake, calmer scheduling, and better daily preparation.
             </p>
           </div>
 
@@ -487,19 +487,19 @@ function PublicBookingPage({ onNavigate, session, profile, onPrimaryAction }) {
           </div>
 
           <div className="border-l border-slate-200 pl-8">
-            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Contact style</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Support format</p>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
               <p className="flex items-center gap-2">
                 <PhoneCall className="h-4 w-4 text-teal-600" />
-                +91 front desk workflow
+                Front-desk and counseling workflow
               </p>
               <p className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-teal-600" />
-                hello@caredesk.app
+                support@caredesk.health
               </p>
               <p className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-teal-600" />
-                Built for modern consultation teams
+                Built for modern clinics and coaching institutes
               </p>
             </div>
           </div>
@@ -646,7 +646,7 @@ function AdminDashboard({ profile }) {
           <p className="text-sm font-semibold uppercase text-teal-700">Private dashboard</p>
           <h1 className="mt-2 text-3xl font-black text-slate-950">Lead and appointment command center</h1>
           <p className="mt-3 text-sm font-medium text-slate-600">
-            Signed in as {profile?.owner_name || profile?.business_name || 'CareDesk admin'}. Manage leads, appointments, and follow-ups from one protected workspace.
+            Signed in as {profile?.owner_name || profile?.business_name || 'CareDesk admin'}. Manage clinic visits, counseling inquiries, learner calls, and follow-ups from one protected workspace.
           </p>
         </div>
         <button
@@ -672,7 +672,7 @@ function AdminDashboard({ profile }) {
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.2)] transition duration-300 hover:-translate-y-1.5 hover:border-teal-200 hover:shadow-[0_28px_56px_-24px_rgba(15,23,42,0.22)]">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-slate-950">Lead pipeline</h2>
+            <h2 className="text-xl font-bold text-slate-950">Inquiry pipeline</h2>
             {loading ? <span className="text-sm text-slate-500">Loading...</span> : null}
           </div>
           <div className="space-y-3">
@@ -682,7 +682,7 @@ function AdminDashboard({ profile }) {
                   <div>
                     <h3 className="font-bold text-slate-950">{lead.name}</h3>
                     <p className="text-sm text-slate-500">{lead.email} / {lead.phone}</p>
-                    <p className="mt-2 text-sm text-slate-600">{lead.inquiry || 'No inquiry provided.'}</p>
+                    <p className="mt-2 text-sm text-slate-600">{lead.inquiry || 'No medical or coaching note provided yet.'}</p>
                   </div>
                   {lead.status_locked ? (
                     <span
@@ -712,7 +712,7 @@ function AdminDashboard({ profile }) {
           <div className="space-y-3">
             {dashboard.appointments.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-medium text-slate-500">
-                No upcoming appointments are queued right now.
+                No clinic or coaching appointments are queued right now.
               </div>
             ) : (
               dashboard.appointments.map((appointment) => (
