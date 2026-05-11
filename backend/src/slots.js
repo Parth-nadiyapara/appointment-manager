@@ -7,7 +7,10 @@ const LUNCH_START_HOUR = 13;
 const LUNCH_END_HOUR = 14;
 
 export function buildDailySlots(date, durationMinutes, appointments = []) {
-  const booked = new Set(appointments.map((appointment) => appointment.starts_at));
+  const bookedRanges = appointments.map((appointment) => ({
+    startsAtMs: new Date(appointment.starts_at).getTime(),
+    endsAtMs: new Date(appointment.ends_at).getTime()
+  }));
   const slots = [];
   const now = Date.now();
 
@@ -18,12 +21,15 @@ export function buildDailySlots(date, durationMinutes, appointments = []) {
       const closesAt = new Date(dateAndTimeToUtcIso(date, CLOSE_HOUR, 0));
       const inFuture = new Date(startsAt).getTime() > now;
       const startsDuringLunch = hour >= LUNCH_START_HOUR && hour < LUNCH_END_HOUR;
+      const overlapsBookedSlot = bookedRanges.some(
+        (appointment) => new Date(startsAt).getTime() < appointment.endsAtMs && endsAt.getTime() > appointment.startsAtMs
+      );
 
       if (endsAt <= closesAt && !startsDuringLunch) {
         slots.push({
           startsAt,
           label: formatIstLabel(startsAt),
-          available: !booked.has(startsAt) && inFuture
+          available: !overlapsBookedSlot && inFuture
         });
       }
     }

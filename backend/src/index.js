@@ -122,7 +122,7 @@ app.get('/api/availability', async (req, res) => {
   const dayEnd = endOfIstDayUtc(date);
   const { data: appointments, error } = await supabase
     .from('appointments')
-    .select('starts_at')
+    .select('starts_at, ends_at')
     .gte('starts_at', dayStart)
     .lte('starts_at', dayEnd)
     .neq('status', 'cancelled');
@@ -167,24 +167,25 @@ app.post('/api/bookings', async (req, res) => {
     return;
   }
 
-  const { data: existing, error: existingError } = await supabase
+  const endsAt = new Date(new Date(startsAt).getTime() + service.duration_minutes * 60 * 1000).toISOString();
+
+  const { data: existingAppointments, error: existingError } = await supabase
     .from('appointments')
-    .select('id')
-    .eq('starts_at', startsAt)
+    .select('id, starts_at, ends_at')
+    .lt('starts_at', endsAt)
+    .gt('ends_at', startsAt)
     .neq('status', 'cancelled')
-    .maybeSingle();
+    .limit(1);
 
   if (existingError) {
     res.status(500).json({ error: existingError.message });
     return;
   }
 
-  if (existing) {
+  if ((existingAppointments || []).length > 0) {
     res.status(409).json({ error: 'That slot was just booked. Please choose another time.' });
     return;
   }
-
-  const endsAt = new Date(new Date(startsAt).getTime() + service.duration_minutes * 60 * 1000).toISOString();
 
   const { data: savedLead, error: leadError } = await supabase
     .from('leads')
